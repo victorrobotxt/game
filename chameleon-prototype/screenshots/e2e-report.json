@@ -1,0 +1,387 @@
+{
+  "base": "http://localhost:5199",
+  "fps": 60.031752331822965,
+  "results": [
+    {
+      "name": "PixiJS v8 initialised on WebGL",
+      "ok": true,
+      "detail": "renderer=webgl"
+    },
+    {
+      "name": "canvas present at 1280x720",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "rendered frame is non-blank",
+      "ok": true,
+      "detail": "179 colours, 3% lit"
+    },
+    {
+      "name": "frame rate >= 55 FPS",
+      "ok": true,
+      "detail": "rAF 60.0 fps, in-game 60 fps"
+    },
+    {
+      "name": "boots into the TITLE screen (two clocks, PRESS SPACE)",
+      "ok": true,
+      "detail": "flow=TITLE"
+    },
+    {
+      "name": "SPACE on the title starts wave 1 in PLAYING",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "first-wave coach teaches the shift",
+      "ok": true,
+      "detail": "SPACE shifts realm. Do it as the ring round you closes = PERFECT"
+    },
+    {
+      "name": "procedural music is sequenced on the beat clock",
+      "ok": true,
+      "detail": "7 notes/s at 100 BPM"
+    },
+    {
+      "name": "keyboard moves the alchemist",
+      "ok": true,
+      "detail": "(600,290) -> (712,231)"
+    },
+    {
+      "name": "chain reaction scored across realms",
+      "ok": true,
+      "detail": "score 100 -> 3725"
+    },
+    {
+      "name": "a finished chain vacuums its coins to the player",
+      "ok": true,
+      "detail": "old coins left 0, collected 13, best chain 10"
+    },
+    {
+      "name": "particle + label pools stay within capacity",
+      "ok": true,
+      "detail": "{\"particles\":{\"inUse\":0,\"capacity\":250},\"labels\":{\"inUse\":0,\"capacity\":40}}"
+    },
+    {
+      "name": "SPACE shifts realm",
+      "ok": true,
+      "detail": "SOLAR_ORDER -> SHADOW_ALCHEMY"
+    },
+    {
+      "name": "coach moves on to the lure trick after the first shift",
+      "ok": true,
+      "detail": "Transmuted! Now shift on the beat twice in a row for a PERFECT combo"
+    },
+    {
+      "name": "shift spam inside cooldown is ignored",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "palette interpolated to SHADOW_ALCHEMY",
+      "ok": true,
+      "detail": "blend=0.99"
+    },
+    {
+      "name": "keys 1-5 hot-swap all theme presets",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "each preset reskins the arena (distinct rendered palettes)",
+      "ok": true,
+      "detail": "avg RGB 26/13/12  16/16/25  14/18/14  21/14/12  13/11/17; min distance 6"
+    },
+    {
+      "name": "each preset has its own tempo",
+      "ok": true,
+      "detail": "100, 124, 92, 108, 84 BPM"
+    },
+    {
+      "name": "C toggles calm mode and M mute, both shown on the HUD",
+      "ok": true,
+      "detail": "status now \"\""
+    },
+    {
+      "name": "HUD theme buttons are clickable",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CHAIN_OVERLOAD: shifting vents instability for score",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "TIME_ECHO spawns recorded ghosts",
+      "ok": true,
+      "detail": "echoes=2"
+    },
+    {
+      "name": "TIME_ECHO switches exist",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "game HUD shows phone linked",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "gyro tilt packets steer SHADOW_LENS in real time",
+      "ok": true,
+      "detail": "angles 0°, 45°, -108°, 146°"
+    },
+    {
+      "name": "lens reveals hidden shadow runes only inside the cone",
+      "ok": true,
+      "detail": "1/3 revealed at 25°"
+    },
+    {
+      "name": "phone joystick moves the player",
+      "ok": true,
+      "detail": "dx=163"
+    },
+    {
+      "name": "phone SHIFT REALM button shifts the realm",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "gyro packets streamed at ~30 Hz",
+      "ok": true,
+      "detail": "476 packets"
+    },
+    {
+      "name": "phone mirrors the game (mode, realm, button label)",
+      "ok": true,
+      "detail": "{\"mode\":\"play\",\"realm\":\"SHADOW_ALCHEMY\",\"accent\":\"#3ef0ff\",\"label\":\"SHIFT REALM\"}"
+    },
+    {
+      "name": "phone takes on the new realm colours after a shift",
+      "ok": true,
+      "detail": "#3ef0ff -> #ffd34d"
+    },
+    {
+      "name": "getting hit vibrates the phone",
+      "ok": true,
+      "detail": "[25,15,15]"
+    },
+    {
+      "name": "J opens the Jackpot Cards draft",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "phone button turns into SLAM STOP during the draft",
+      "ok": true,
+      "detail": "SLAM STOP"
+    },
+    {
+      "name": "all 12 cards are pointer targets on a reused draft",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "clicking cards flips them",
+      "ok": true,
+      "detail": "flips=2 revealed=0,5 draft=PICKING targets=[{\"x\":451,\"y\":190},{\"x\":577,\"y\":356}]"
+    },
+    {
+      "name": "SPACE slam-stops into auto-reveal",
+      "ok": true,
+      "detail": "REVEALING"
+    },
+    {
+      "name": "SPACE skip fast-forwards the reveal",
+      "ok": true,
+      "detail": "7ms"
+    },
+    {
+      "name": "a suit tripled",
+      "ok": true,
+      "detail": "CLUBS after 6 flips"
+    },
+    {
+      "name": "draft awards a permanent roguelike tier and returns to combat",
+      "ok": true,
+      "detail": "+CLUBS"
+    },
+    {
+      "name": "SPACE spam through a whole draft never soft-locks",
+      "ok": true,
+      "detail": "CLOSED"
+    },
+    {
+      "name": "20 golden coins fill GRAND and trigger the draft",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "cameo power-ups run (frog familiar active)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "dying shows the results card (best chain, combo, coins, suit tiers)",
+      "ok": true,
+      "detail": "flow=GAME_OVER bestChain=10 coins=128"
+    },
+    {
+      "name": "SPACE on the results card rewinds into a fresh run",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ESC returns to the title screen",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "guided tour: zero overlap between tour pill/caption, preset banner, popups and top HUD",
+      "ok": true,
+      "detail": "83 samples (10 with banner, 74 with caption) "
+    },
+    {
+      "name": "T starts the 60 s guided tour: bot plays, captions, presets change on cue",
+      "ok": true,
+      "detail": "demo=tour theme=CHAIN_OVERLOAD score=8836"
+    },
+    {
+      "name": "any key hands control back (title, theme restored)",
+      "ok": true,
+      "detail": "demo=off flow=TITLE theme=PARALLEL_SYNC"
+    },
+    {
+      "name": "attract mode: the bot plays by itself",
+      "ok": true,
+      "detail": "moved 499px"
+    },
+    {
+      "name": "a click also ends the demo",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "375 px title fits its frame with >= 24 px padding",
+      "ok": true,
+      "detail": "left 27 px, right 26 px"
+    },
+    {
+      "name": "375x667: tap/SPACE starts, HUD fits with no overlaps",
+      "ok": true,
+      "detail": "compact=true arena 351x170"
+    },
+    {
+      "name": "375 px: theme buttons are tappable",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "900x500: tap/SPACE starts, HUD fits with no overlaps",
+      "ok": true,
+      "detail": "compact=false arena 737x356"
+    },
+    {
+      "name": "still rendering after full playtest",
+      "ok": true,
+      "detail": "578 colours"
+    },
+    {
+      "name": "zero pageerror / console.error events",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "zero console warnings (e.g. Pixi deprecations)",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "errors": [],
+  "warnings": [],
+  "final": {
+    "flow": "PLAYING",
+    "draft": "CLOSED",
+    "draftFlips": 9,
+    "draftMatched": "CLUBS",
+    "draftRevealed": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      9,
+      10
+    ],
+    "draftHot": "SPADES",
+    "draftReason": "GRAND",
+    "lastAward": "CLUBS",
+    "theme": "PARALLEL_SYNC",
+    "bpm": 100,
+    "beats": 178.06317333331236,
+    "musicNotes": 809,
+    "audioReady": true,
+    "realm": "SOLAR_ORDER",
+    "realmBlend": 7.363675497667327e-55,
+    "demo": "off",
+    "demoCaption": "The alchemist plays itself: luring foes onto the other realm’s runes and shifting on the beat.",
+    "calm": false,
+    "muted": false,
+    "status": "",
+    "coach": "",
+    "title": false,
+    "results": false,
+    "runeDanger": 0.9082688007852653,
+    "fps": 60,
+    "frames": 6425,
+    "uptimeMs": 107114,
+    "score": 0,
+    "wave": 1,
+    "hp": 1,
+    "combo": 0,
+    "bestCombo": 0,
+    "bestChain": 0,
+    "lureKills": 0,
+    "linkCoins": 0,
+    "totalCoins": 0,
+    "tiers": {
+      "CLUBS": 0,
+      "DIAMONDS": 0,
+      "HEARTS": 0,
+      "SPADES": 0
+    },
+    "player": {
+      "x": 600,
+      "y": 290
+    },
+    "lensAngle": 0.4311387407187823,
+    "lensSource": "gyro",
+    "gyro": {
+      "status": "linked",
+      "packets": 1900,
+      "angle": 0.4311387407187823,
+      "steering": true
+    },
+    "entities": {
+      "enemies": 7,
+      "coins": 0,
+      "oldCoins": 0,
+      "echoes": 0,
+      "frog": false
+    },
+    "pools": {
+      "particles": {
+        "inUse": 0,
+        "capacity": 250
+      },
+      "labels": {
+        "inUse": 0,
+        "capacity": 40
+      }
+    },
+    "renderer": "webgl"
+  }
+}
