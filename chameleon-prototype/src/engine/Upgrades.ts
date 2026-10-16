@@ -31,9 +31,9 @@ export function deriveStats(t: UpgradeTiers): PlayerStats {
         shiftCooldown: 0.42 * Math.pow(0.85, t.CLUBS),
         magnetRadius: 70 + 35 * t.DIAMONDS,
         scoreMul: 1 + 0.25 * t.DIAMONDS,
-        maxHp: 5 + t.HEARTS,
+        maxHp: Math.min(6, 3 + t.HEARTS), // 3 flasks to start; HEARTS draft tiers grow it to 6
         shieldMax: 1 + Math.floor(t.HEARTS / 2),
-        shieldRegenPerSec: 1 / 8 + 0.06 * t.HEARTS,
+        shieldRegenPerSec: (1 / 8 + 0.06 * t.HEARTS) / 2,
         blastRadius: 95 * (1 + 0.18 * t.SPADES),
         critChance: 0.1 + 0.08 * t.SPADES,
         critMul: 1.5 + 0.5 * t.SPADES,

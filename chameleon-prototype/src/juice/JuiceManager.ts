@@ -68,6 +68,17 @@ export class JuiceManager {
         });
     }
 
+    /** Labels stay upright and float screen-up even when the arena is rotated (portrait). */
+    private labelRot = 0;
+    private upX = 0;
+    private upY = -1;
+    setOrientation(arenaRotation: number) {
+        this.labelRot = -arenaRotation;
+        this.upX = -Math.sin(arenaRotation);
+        this.upY = -Math.cos(arenaRotation);
+        for (const l of this.labels.all) l.text.rotation = this.labelRot;
+    }
+
     /** Reduced shake / flash mode (accessibility): shake is scaled down and hit-stop is skipped. */
     calm = false;
 
@@ -151,8 +162,9 @@ export class JuiceManager {
         for (const l of this.labels.all) {
             if (!this.labels.active.has(l)) continue;
             const t = l.text;
-            const hw = t.width / 2;
-            const hh = t.height / 2;
+            const sideways = this.labelRot !== 0;
+            const hw = (sideways ? t.height : t.width) / 2;
+            const hh = (sideways ? t.width : t.height) / 2;
             if (t.x + hw < r.x || t.x - hw > r.x + r.w || t.y + hh < r.y || t.y - hh > r.y + r.h) continue;
             t.y = t.y < r.y + r.h / 2 ? r.y - hh - 2 : r.y + r.h + hh + 2;
         }
@@ -199,7 +211,8 @@ export class JuiceManager {
                 continue;
             }
             l.vy *= Math.exp(-2.5 * dt);
-            l.text.y += l.vy * dt;
+            l.text.x -= this.upX * l.vy * dt;
+            l.text.y -= this.upY * l.vy * dt;
             const t = 1 - l.life / l.maxLife;
             const pop = t < 0.12 ? 0.6 + (t / 0.12) * 0.6 : 1.2 - Math.min(0.2, (t - 0.12) * 1.2);
             l.text.scale.set(l.baseScale * pop);

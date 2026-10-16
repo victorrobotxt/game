@@ -1,6 +1,6 @@
 {
   "base": "http://localhost:5199",
-  "fps": 60.031752331822965,
+  "fps": 60.130199274439796,
   "results": [
     {
       "name": "PixiJS v8 initialised on WebGL",
@@ -15,12 +15,12 @@
     {
       "name": "rendered frame is non-blank",
       "ok": true,
-      "detail": "179 colours, 3% lit"
+      "detail": "181 colours, 3% lit"
     },
     {
       "name": "frame rate >= 55 FPS",
       "ok": true,
-      "detail": "rAF 60.0 fps, in-game 60 fps"
+      "detail": "rAF 60.1 fps, in-game 60 fps"
     },
     {
       "name": "boots into the TITLE screen (two clocks, PRESS SPACE)",
@@ -40,7 +40,7 @@
     {
       "name": "procedural music is sequenced on the beat clock",
       "ok": true,
-      "detail": "7 notes/s at 100 BPM"
+      "detail": "11 notes/s at 100 BPM"
     },
     {
       "name": "keyboard moves the alchemist",
@@ -50,12 +50,12 @@
     {
       "name": "chain reaction scored across realms",
       "ok": true,
-      "detail": "score 100 -> 3725"
+      "detail": "score 0 -> 4700"
     },
     {
       "name": "a finished chain vacuums its coins to the player",
       "ok": true,
-      "detail": "old coins left 0, collected 13, best chain 10"
+      "detail": "old coins left 0, collected 16, best chain 12"
     },
     {
       "name": "particle + label pools stay within capacity",
@@ -90,7 +90,7 @@
     {
       "name": "each preset reskins the arena (distinct rendered palettes)",
       "ok": true,
-      "detail": "avg RGB 26/13/12  16/16/25  14/18/14  21/14/12  13/11/17; min distance 6"
+      "detail": "avg RGB 33/17/11  18/20/25  15/22/12  25/17/9  11/11/16; min distance 10"
     },
     {
       "name": "each preset has its own tempo",
@@ -140,7 +140,7 @@
     {
       "name": "phone joystick moves the player",
       "ok": true,
-      "detail": "dx=163"
+      "detail": "dx=154"
     },
     {
       "name": "phone SHIFT REALM button shifts the realm",
@@ -150,7 +150,7 @@
     {
       "name": "gyro packets streamed at ~30 Hz",
       "ok": true,
-      "detail": "476 packets"
+      "detail": "526 packets"
     },
     {
       "name": "phone mirrors the game (mode, realm, button label)",
@@ -185,7 +185,7 @@
     {
       "name": "clicking cards flips them",
       "ok": true,
-      "detail": "flips=2 revealed=0,5 draft=PICKING targets=[{\"x\":451,\"y\":190},{\"x\":577,\"y\":356}]"
+      "detail": "flips=2 revealed=0,5 draft=PICKING targets=[{\"x\":424.33609958506224,\"y\":199.58091286307055},{\"x\":568.1120331950208,\"y\":389}]"
     },
     {
       "name": "SPACE slam-stops into auto-reveal",
@@ -195,17 +195,17 @@
     {
       "name": "SPACE skip fast-forwards the reveal",
       "ok": true,
-      "detail": "7ms"
+      "detail": "6ms"
     },
     {
       "name": "a suit tripled",
       "ok": true,
-      "detail": "CLUBS after 6 flips"
+      "detail": "SPADES after 9 flips"
     },
     {
       "name": "draft awards a permanent roguelike tier and returns to combat",
       "ok": true,
-      "detail": "+CLUBS"
+      "detail": "+SPADES"
     },
     {
       "name": "SPACE spam through a whole draft never soft-locks",
@@ -225,7 +225,7 @@
     {
       "name": "dying shows the results card (best chain, combo, coins, suit tiers)",
       "ok": true,
-      "detail": "flow=GAME_OVER bestChain=10 coins=128"
+      "detail": "flow=GAME_OVER bestChain=12 coins=118"
     },
     {
       "name": "SPACE on the results card rewinds into a fresh run",
@@ -240,12 +240,12 @@
     {
       "name": "guided tour: zero overlap between tour pill/caption, preset banner, popups and top HUD",
       "ok": true,
-      "detail": "83 samples (10 with banner, 74 with caption) "
+      "detail": "82 samples (10 with banner, 74 with caption) "
     },
     {
       "name": "T starts the 60 s guided tour: bot plays, captions, presets change on cue",
       "ok": true,
-      "detail": "demo=tour theme=CHAIN_OVERLOAD score=8836"
+      "detail": "demo=tour theme=CHAIN_OVERLOAD score=6471"
     },
     {
       "name": "any key hands control back (title, theme restored)",
@@ -255,7 +255,7 @@
     {
       "name": "attract mode: the bot plays by itself",
       "ok": true,
-      "detail": "moved 499px"
+      "detail": "moved 490px"
     },
     {
       "name": "a click also ends the demo",
@@ -263,14 +263,14 @@
       "detail": ""
     },
     {
-      "name": "375 px title fits its frame with >= 24 px padding",
+      "name": "375 px title keeps >= 24 px padding inside its 12 px screen margin",
       "ok": true,
       "detail": "left 27 px, right 26 px"
     },
     {
       "name": "375x667: tap/SPACE starts, HUD fits with no overlaps",
       "ok": true,
-      "detail": "compact=true arena 351x170"
+      "detail": "compact=true arena 228x471"
     },
     {
       "name": "375 px: theme buttons are tappable",
@@ -283,9 +283,54 @@
       "detail": "compact=false arena 737x356"
     },
     {
+      "name": "no iOS text selection / copy callout on the canvas (CSS + handlers)",
+      "ok": true,
+      "detail": "{\"userSelect\":\"none\",\"touchAction\":\"none\",\"calloutRule\":true,\"contextmenuBlocked\":true,\"selectstartBlocked\":true,\"touchstartBlocked\":true}"
+    },
+    {
+      "name": "390x844 portrait: arena is rotated and fills > 68% of the height",
+      "ok": true,
+      "detail": "arena 313x648 = 77% of 844"
+    },
+    {
+      "name": "drag up on the rotated portrait arena moves the alchemist UP the screen",
+      "ok": true,
+      "detail": "screen y 354 -> 315"
+    },
+    {
+      "name": "multi-touch: thumb 2 tap shifts realm without interrupting thumb 1",
+      "ok": true,
+      "detail": "realm SOLAR_ORDER -> SHADOW_ALCHEMY; after thumb 2 lifted moved 52 px up; stick id 3/3/null"
+    },
+    {
+      "name": "390x844: Jackpot Cards header / 4x3 grid / suit footer fit with zero overlap",
+      "ok": true,
+      "detail": "cards 83px wide"
+    },
+    {
+      "name": "phone: tapping outside the cards slam-stops the draft",
+      "ok": true,
+      "detail": "REVEALING"
+    },
+    {
+      "name": "1280x720: Jackpot Cards layout fits with zero overlap",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 1280x720 never shows the rotate lock",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "844x390 phone landscape: \"ROTATE PHONE TO PORTRAIT\" lock, simulation paused",
+      "ok": true,
+      "detail": "display=flex simTime 0.00 -> 0.00"
+    },
+    {
       "name": "still rendering after full playtest",
       "ok": true,
-      "detail": "578 colours"
+      "detail": "432 colours"
     },
     {
       "name": "zero pageerror / console.error events",
@@ -303,8 +348,8 @@
   "final": {
     "flow": "PLAYING",
     "draft": "CLOSED",
-    "draftFlips": 9,
-    "draftMatched": "CLUBS",
+    "draftFlips": 7,
+    "draftMatched": "DIAMONDS",
     "draftRevealed": [
       0,
       1,
@@ -312,44 +357,50 @@
       3,
       4,
       5,
-      6,
-      9,
-      10
+      6
     ],
     "draftHot": "SPADES",
-    "draftReason": "GRAND",
-    "lastAward": "CLUBS",
+    "draftReason": "DEBUG",
+    "lastAward": "DIAMONDS",
     "theme": "PARALLEL_SYNC",
     "bpm": 100,
-    "beats": 178.06317333331236,
-    "musicNotes": 809,
+    "beats": 198.52819111108465,
+    "toBeatMs": 283.08533334920867,
+    "musicNotes": 1036,
     "audioReady": true,
     "realm": "SOLAR_ORDER",
-    "realmBlend": 7.363675497667327e-55,
+    "realmBlend": 1.3776701266357149e-106,
     "demo": "off",
     "demoCaption": "The alchemist plays itself: luring foes onto the other realm’s runes and shifting on the beat.",
+    "rotateLock": false,
+    "simTime": 5.583333333333319,
+    "touch": {
+      "movePointerId": null,
+      "joyX": 0,
+      "joyY": 0
+    },
     "calm": false,
     "muted": false,
     "status": "",
     "coach": "",
     "title": false,
     "results": false,
-    "runeDanger": 0.9082688007852653,
+    "runeDanger": 0.5685957268356423,
     "fps": 60,
-    "frames": 6425,
-    "uptimeMs": 107114,
-    "score": 0,
+    "frames": 7183,
+    "uptimeMs": 119832,
+    "score": 843,
     "wave": 1,
     "hp": 1,
     "combo": 0,
     "bestCombo": 0,
-    "bestChain": 0,
-    "lureKills": 0,
-    "linkCoins": 0,
-    "totalCoins": 0,
+    "bestChain": 3,
+    "lureKills": 1,
+    "linkCoins": 3,
+    "totalCoins": 3,
     "tiers": {
       "CLUBS": 0,
-      "DIAMONDS": 0,
+      "DIAMONDS": 1,
       "HEARTS": 0,
       "SPADES": 0
     },
@@ -357,16 +408,16 @@
       "x": 600,
       "y": 290
     },
-    "lensAngle": 0.4311387407187823,
+    "lensAngle": 0.4311387407508026,
     "lensSource": "gyro",
     "gyro": {
       "status": "linked",
-      "packets": 1900,
-      "angle": 0.4311387407187823,
+      "packets": 2432,
+      "angle": 0.4311387407508026,
       "steering": true
     },
     "entities": {
-      "enemies": 7,
+      "enemies": 4,
       "coins": 0,
       "oldCoins": 0,
       "echoes": 0,

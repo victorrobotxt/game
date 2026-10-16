@@ -86,6 +86,8 @@ export const SUITS: readonly Suit[] = [Suit.CLUBS, Suit.DIAMONDS, Suit.HEARTS, S
 export type GameEvent =
     | { type: 'SHIFT'; realm: Realm; perfect: boolean; combo: number; x: number; y: number; radius: number }
     | { type: 'SHIFT_DENIED' }
+    | { type: 'MISTIMED'; x: number; y: number; lock: number }
+    | { type: 'ENEMY_TELEGRAPH'; x: number; y: number }
     | { type: 'EXPLOSION'; x: number; y: number; radius: number; depth: number; chain: number; chainId: number; transmute: boolean }
     | { type: 'ENEMY_HIT'; x: number; y: number; dmg: number; crit: boolean }
     | { type: 'ENEMY_KILLED'; x: number; y: number; realm: Realm; score: number; depth: number }

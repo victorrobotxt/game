@@ -2,16 +2,40 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>The Alchemist's Parallel Clock</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #05020c; overflow: hidden; }
+      /* A game surface, not a document: no selection handles, copy callout, drag ghosts,
+         tap flashes, scrolling or rubber-band bounce (iOS Safari / DuckDuckGo included). */
+      html, body, #app, canvas {
+        -webkit-touch-callout: none !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
+        -webkit-user-drag: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+        touch-action: none !important;
+        overscroll-behavior: none !important;
+      }
+      html, body { margin: 0; height: 100%; background: #05020c; overflow: hidden; position: fixed; inset: 0; }
       canvas { display: block; }
       #boot { position: fixed; inset: 0; display: grid; place-items: center; color: #ffd34d; font: bold 14px Verdana, sans-serif; letter-spacing: 4px; }
+      /* Short mobile landscape: iOS ignores screen.orientation.lock(), so we ask nicely. */
+      #rotate { position: fixed; inset: 0; z-index: 10; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+        background: radial-gradient(ellipse at 50% 40%, #1d0d3a 0%, #05020c 70%); color: #ffe9a8; font: bold 18px Georgia, 'DejaVu Serif', serif; letter-spacing: 4px; text-align: center; }
+      #rotate small { display: block; font: 12px Verdana, 'DejaVu Sans', sans-serif; letter-spacing: 1px; color: #bfb3d9; margin-top: 8px; }
+      #rotate svg { width: 84px; height: 84px; animation: turn 2.2s ease-in-out infinite; }
+      @keyframes turn { 0%, 15% { transform: rotate(-90deg); } 55%, 100% { transform: rotate(0deg); } }
+      @media (prefers-reduced-motion: reduce) { #rotate svg { animation: none; } }
+      body.rotate-lock #rotate { display: flex; }
     </style>
   </head>
   <body>
     <div id="boot">WINDING THE CLOCK…</div>
+    <div id="rotate" role="alert">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="18" y="4" width="28" height="56" rx="6" fill="none" stroke="#ffd34d" stroke-width="3"/><circle cx="32" cy="52" r="2.5" fill="#ffd34d"/><path d="M8 22 a24 24 0 0 1 10 -12" fill="none" stroke="#3ef0ff" stroke-width="3" stroke-linecap="round"/><path d="M15 6 l3 4 -5 1" fill="none" stroke="#3ef0ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div>ROTATE PHONE TO PORTRAIT<small>the clock is paused until you do</small></div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

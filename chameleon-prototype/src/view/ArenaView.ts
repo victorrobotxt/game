@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite } from 'pixi.js';
-import { ARENA_H, ARENA_W, COIN_LIFE, LENS_RANGE, MAX_COINS, MAX_ECHOES, MAX_ENEMIES, MAX_POWERUPS, type World } from '../engine/World';
+import { ARENA_H, ARENA_W, COIN_LIFE, LENS_RANGE, MISTIME_LOCK, MAX_COINS, MAX_ECHOES, MAX_ENEMIES, MAX_POWERUPS, type World } from '../engine/World';
 import { PowerUpKind, Realm, Theme, type Theme as ThemeT } from '../engine/types';
 import { ELEMENT_COLORS, SKINS, lerpColor, mixPalette, type RealmPalette } from './Palette';
 import type { ArenaBaker } from './ArenaMotifs';
@@ -430,10 +430,12 @@ export class ArenaView extends Container {
             g.circle(0, 0, r).stroke({ width: 2 + phase * 2, color: pal.accent, alpha: (0.15 + phase * 0.55) * dim });
             g.circle(0, 0, 30).stroke({ width: 1, color: pal.accent, alpha: 0.25 * dim });
         }
-        const cd = lens ? world.lensFlareCd / (world.stats.shiftCooldown * 1.5) : p.shiftCd / world.stats.shiftCooldown;
+        const locked = !lens && p.shiftCd > world.stats.shiftCooldown + 0.01; // MISTIMED lockout
+        const cd = lens ? world.lensFlareCd / (world.stats.shiftCooldown * 1.5) : locked ? p.shiftCd / MISTIME_LOCK : p.shiftCd / world.stats.shiftCooldown;
         if (cd > 0) {
             const start = -Math.PI / 2;
-            g.arc(0, 0, 36, start, start + Math.PI * 2 * (1 - cd)).stroke({ width: 3, color: 0xffffff, alpha: 0.55 });
+            if (locked) g.circle(0, 0, 36).stroke({ width: 3, color: 0xff3048, alpha: 0.25 });
+            g.arc(0, 0, 36, start, start + Math.PI * 2 * (1 - cd)).stroke({ width: locked ? 4 : 3, color: locked ? 0xff3048 : 0xffffff, alpha: locked ? 0.9 : 0.55 });
         }
         const pips = Math.min(world.combo, 8);
         for (let i = 0; i < pips; i++) {
@@ -617,6 +619,7 @@ export class ArenaView extends Container {
         });
 
         this.histHead = (this.histHead + 1) % HIST;
+        const warn = this.lureGfx; // lunge telegraphs share the overlay graphics
         world.enemies.forEach((e, i) => {
             const s = this.enemySprites[i];
             const glow = this.enemyGlows[i];
@@ -647,6 +650,18 @@ export class ArenaView extends Container {
             // Squash on the beat, stretch towards the player between beats (BPM-synced wobble).
             s.scale.set(size * (1 - pulse * 0.1 + (1 - pulse) * 0.04), size * (1 + pulse * 0.12));
             s.rotation = Math.atan2(p.y - e.y, p.x - e.x); // eyes always on the alchemist
+            if (e.windup > 0) {
+                // Telegraph: shudder, swell, flash red, and a warning arrow at the alchemist.
+                s.position.set(e.x + Math.sin(t * 90 + i) * 2.5, e.y + Math.cos(t * 83 + i) * 2.5);
+                s.scale.set(size * 1.18);
+                const ux = (p.x - e.x) / (Math.hypot(p.x - e.x, p.y - e.y) || 1);
+                const uy = (p.y - e.y) / (Math.hypot(p.x - e.x, p.y - e.y) || 1);
+                const r0 = e.r + 8;
+                const tipX = e.x + ux * (r0 + 26);
+                const tipY = e.y + uy * (r0 + 26);
+                warn.moveTo(e.x + ux * r0, e.y + uy * r0).lineTo(tipX, tipY).stroke({ width: 4, color: 0xff3048, alpha: 0.9 });
+                warn.poly([tipX + ux * 10, tipY + uy * 10, tipX - uy * 7, tipY + ux * 7, tipX + uy * 7, tipY - ux * 7]).fill({ color: 0xff3048, alpha: 0.9 });
+            } else if (e.lunge > 0) s.scale.set(size * 1.3, size * 0.8); // streaking
             trail.forEach((d, k) => {
                 const idx = (this.histHead - (k + 1) * 5 + HIST * 4) % HIST;
                 d.visible = !hidden;
@@ -656,7 +671,7 @@ export class ArenaView extends Container {
                 d.scale.set(size * (0.42 - k * 0.1));
             });
             s.alpha = hidden ? 0.04 + Math.max(0, Math.sin(t * 5 + i)) * 0.05 : 0.22 + solid * 0.78;
-            s.tint = e.flash > 0.5 || solid > 0.5 ? 0xffffff : 0x9a9aa8;
+            s.tint = e.windup > 0 && Math.sin(t * 50) > 0 ? 0xff6070 : e.flash > 0.5 || solid > 0.5 ? 0xffffff : 0x9a9aa8;
             glow.position.set(e.x, e.y);
             glow.tint = e.flash > 0 ? 0xffffff : own.enemy;
             glow.alpha = hidden ? 0 : (0.15 + solid * 0.5) * (e.brute ? 1.3 : 1) + e.flash * 0.6;

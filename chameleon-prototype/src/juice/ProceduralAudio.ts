@@ -104,6 +104,12 @@ export class ProceduralAudio {
         if (perfect) this.tone(toShadow ? 1318 : 1568, 0.35, { type: 'triangle', vol: 0.15 });
     }
 
+    /** Off-beat shift: a dull, muted thud (the lockout). */
+    mistimed() {
+        this.tone(70, 0.22, { type: 'sine', vol: 0.45, to: 40 });
+        this.burst(0.12, { vol: 0.25, from: 400, to: 80 });
+    }
+
     denied() {
         this.tone(140, 0.08, { type: 'square', vol: 0.06 });
     }

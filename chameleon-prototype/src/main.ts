@@ -54,19 +54,38 @@ const backdrop = new Graphics();
 app.stage.addChild(arena, backdrop, vignette, flyLayer, hud, draftView, hud.overlay);
 const touchFirst = matchMedia('(pointer: coarse)').matches;
 hud.setTouch(touchFirst);
+draft.touch = touchFirst;
 
 let arenaScale = 1;
+/** On-screen rect of the arena (after the portrait rotation). */
+const arenaRect = { x: 0, y: 0, w: 0, h: 0 };
+/** Touch-first device (phones/tablets); desktop windows never get the rotate lock. */
+const touchDevice = matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && !matchMedia('(hover: hover)').matches);
+let rotateLock = false;
 function layout() {
     const { width: w, height: h } = app.screen;
     hud.layout(w, h);
-    const availH = h - hud.topH - hud.bottomH - 16;
-    arenaScale = Math.min((w - 24) / ARENA_W, availH / ARENA_H);
+    // Portrait phones: rotate the arena 90° so its long axis runs top-to-bottom and fills the
+    // screen. Input is rotated to match (toArena), so "up" on screen is always up.
+    const portrait = w / h < 0.85;
+    arena.rotation = portrait ? Math.PI / 2 : 0;
+    juice.setOrientation(arena.rotation);
+    const availH = h - hud.topH - hud.bottomH - (portrait ? 8 : 16);
+    const onW0 = portrait ? ARENA_H : ARENA_W;
+    const onH0 = portrait ? ARENA_W : ARENA_H;
+    arenaScale = Math.min((w - (portrait ? 16 : 24)) / onW0, availH / onH0);
+    const onW = onW0 * arenaScale;
+    const onH = onH0 * arenaScale;
+    Object.assign(arenaRect, { x: (w - onW) / 2, y: hud.topH + (portrait ? 4 : 8) + (availH - onH) / 2, w: onW, h: onH });
     arena.scale.set(arenaScale);
-    arena.position.set((w - ARENA_W * arenaScale) / 2, hud.topH + 8 + (availH - ARENA_H * arenaScale) / 2);
+    // With rotation +90°, arena-local (0,0) lands at the rect's top-RIGHT corner.
+    arena.position.set(portrait ? arenaRect.x + onW : arenaRect.x, arenaRect.y);
     vignette.width = w;
     vignette.height = h;
     draftView.layout(w, h);
-    drawBackdrop(backdrop, w, h, { x: arena.x, y: arena.y, w: ARENA_W * arenaScale, h: ARENA_H * arenaScale }, hud.topH, hud.bottomH);
+    drawBackdrop(backdrop, w, h, arenaRect, hud.topH, hud.bottomH);
+    rotateLock = touchDevice && window.innerWidth > window.innerHeight && window.innerHeight < 520;
+    document.body.classList.toggle('rotate-lock', rotateLock);
 }
 app.renderer.on('resize', layout);
 layout();
@@ -360,18 +379,43 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => keys.delete(e.code));
 window.addEventListener('blur', () => keys.clear());
 
-// Touch: tap = SPACE, hold/drag = walk towards the finger. Mouse keeps aiming the lens.
-let touchId: number | null = null;
-let touchStart = 0;
-let touchMoved = 0;
-let touchAt: { x: number; y: number } | null = null;
+// iOS / mobile browsers: no selection handles, copy callout, context menu, pinch or bounce.
+for (const ev of ['contextmenu', 'selectstart', 'dragstart', 'gesturestart'] as const) window.addEventListener(ev, (e) => e.preventDefault());
+for (const ev of ['touchstart', 'touchmove'] as const) app.canvas.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+
+/*
+ * Touch, tracked strictly by pointerId:
+ *   thumb 1 (first finger on the arena)  -> floating joystick anchored where it landed
+ *   any other finger while thumb 1 is down -> SPACE (shift / slam-stop / skip) on pointerdown,
+ *                                             never touching thumb 1's movement
+ *   a quick tap with thumb 1 alone          -> SPACE
+ * The mouse keeps aiming the lens.
+ */
+const JOY_R = 56;
+let movePointerId: number | null = null;
+const joyOrigin = { x: 0, y: 0 };
+const joyNow = { x: 0, y: 0 };
+let joyStart = 0;
+let joyTravel = 0;
+const joystick = new Graphics();
+joystick.eventMode = 'none';
+app.stage.addChild(joystick);
 app.stage.eventMode = 'static';
 app.stage.hitArea = app.screen;
 app.stage.on('pointermove', (e: FederatedPointerEvent) => {
     if (e.pointerType === 'touch') {
-        if (e.pointerId !== touchId) return;
-        touchMoved += Math.abs(e.movementX) + Math.abs(e.movementY);
-        touchAt = arena.world.toLocal(e.global);
+        if (e.pointerId !== movePointerId) return;
+        joyTravel += Math.abs(e.global.x - joyNow.x) + Math.abs(e.global.y - joyNow.y);
+        joyNow.x = e.global.x;
+        joyNow.y = e.global.y;
+        // Floating stick: dragging past the rim drags the origin along.
+        const dx = joyNow.x - joyOrigin.x;
+        const dy = joyNow.y - joyOrigin.y;
+        const d = Math.hypot(dx, dy);
+        if (d > JOY_R) {
+            joyOrigin.x = joyNow.x - (dx / d) * JOY_R;
+            joyOrigin.y = joyNow.y - (dy / d) * JOY_R;
+        }
         return;
     }
     pointerAim = arena.world.toLocal(e.global);
@@ -381,19 +425,42 @@ app.stage.on('pointerdown', (e: FederatedPointerEvent) => {
     titleIdle = 0;
     if (demo !== 'off') return stopDemo();
     if (e.pointerType !== 'touch' || e.target !== app.stage) return; // buttons and cards handle themselves
-    touchId = e.pointerId;
-    touchStart = performance.now();
-    touchMoved = 0;
-    touchAt = arena.world.toLocal(e.global);
+    if (movePointerId === null) {
+        movePointerId = e.pointerId;
+        joyOrigin.x = joyNow.x = e.global.x;
+        joyOrigin.y = joyNow.y = e.global.y;
+        joyStart = performance.now();
+        joyTravel = 0;
+    } else if (e.pointerId !== movePointerId) primaryAction(); // second thumb
 });
-const touchEnd = (e: FederatedPointerEvent) => {
-    if (e.pointerId !== touchId) return;
-    if (performance.now() - touchStart < 250 && touchMoved < 24) primaryAction();
-    touchId = null;
-    touchAt = null;
+// Releases are watched on window (native pointerId == federated pointerId), so a finger lifted
+// anywhere, or cancelled by the OS, is always seen.
+const release = (e: PointerEvent) => {
+    if (e.pointerId !== movePointerId) return; // finger 2 lifting never stops finger 1
+    if (performance.now() - joyStart < 220 && joyTravel < 14) primaryAction();
+    movePointerId = null;
 };
-app.stage.on('pointerup', touchEnd);
-app.stage.on('pointerupoutside', touchEnd);
+window.addEventListener('pointerup', release);
+window.addEventListener('pointercancel', release);
+
+function drawJoystick() {
+    const g = joystick;
+    g.clear();
+    if (movePointerId === null || performance.now() - joyStart < 90) return;
+    const accent = arena.pal.accent;
+    g.circle(joyOrigin.x, joyOrigin.y, JOY_R).fill({ color: 0xffffff, alpha: 0.06 }).stroke({ width: 2, color: accent, alpha: 0.45 });
+    g.circle(joyOrigin.x, joyOrigin.y, 6).fill({ color: accent, alpha: 0.4 });
+    g.circle(joyNow.x, joyNow.y, 22).fill({ color: accent, alpha: 0.35 }).stroke({ width: 2, color: 0xffffff, alpha: 0.6 });
+}
+
+/** Screen-space direction -> arena-space direction (the arena is rotated 90° on portrait phones). */
+function toArena(x: number, y: number): { x: number; y: number } {
+    const r = arena.rotation;
+    if (r === 0) return { x, y };
+    const c = Math.cos(-r);
+    const s = Math.sin(-r);
+    return { x: x * c - y * s, y: x * s + y * c };
+}
 
 const input: InputFrame = { moveX: 0, moveY: 0, aim: 0, shift: false };
 function readInput(): InputFrame {
@@ -404,24 +471,30 @@ function readInput(): InputFrame {
         return b;
     }
     const k = (c: string) => (keys.has(c) ? 1 : 0);
-    input.moveX = k('KeyD') + k('ArrowRight') - k('KeyA') - k('ArrowLeft') + gyro.jx;
-    input.moveY = k('KeyS') + k('ArrowDown') - k('KeyW') - k('ArrowUp') + gyro.jy;
-    const p = world.player;
-    const held = touchAt && performance.now() - touchStart > 120;
-    if (held && touchAt) {
-        const dx = touchAt.x - p.x;
-        const dy = touchAt.y - p.y;
+    // Everything below is in SCREEN space (up = up on screen), then rotated into the arena.
+    let mx = k('KeyD') + k('ArrowRight') - k('KeyA') - k('ArrowLeft') + gyro.jx;
+    let my = k('KeyS') + k('ArrowDown') - k('KeyW') - k('ArrowUp') + gyro.jy;
+    let joy = false;
+    if (movePointerId !== null) {
+        const dx = (joyNow.x - joyOrigin.x) / JOY_R;
+        const dy = (joyNow.y - joyOrigin.y) / JOY_R;
         const d = Math.hypot(dx, dy);
-        if (d > 24) {
-            input.moveX += dx / d;
-            input.moveY += dy / d;
+        if (d > 0.15) {
+            const m = Math.min(1, d);
+            mx += (dx / d) * m;
+            my += (dy / d) * m;
+            joy = true;
         }
     }
+    const mv = toArena(mx, my);
+    input.moveX = mv.x;
+    input.moveY = mv.y;
+    const p = world.player;
     if (gyro.steering) {
-        input.aim = gyro.angle;
+        input.aim = gyro.angle - arena.rotation;
         lensSource = 'gyro';
-    } else if (held && touchAt) {
-        input.aim = Math.atan2(touchAt.y - p.y, touchAt.x - p.x);
+    } else if (joy) {
+        input.aim = Math.atan2(mv.y, mv.x);
         lensSource = 'touch';
     } else if (pointerAim) {
         input.aim = Math.atan2(pointerAim.y - p.y, pointerAim.x - p.x);
@@ -495,6 +568,13 @@ function handle(e: GameEvent, now: number) {
         case 'SHIFT_DENIED':
             audio.denied();
             break;
+        case 'MISTIMED':
+            juice.label(e.x, e.y - 40, 'MISTIMED!', 0xff4d6d, 1, 0.9);
+            audio.mistimed();
+            haptic(40);
+            break;
+        case 'ENEMY_TELEGRAPH':
+            break; // drawn by the arena (shudder + warning arrow)
         case 'EXPLOSION': {
             const col = e.transmute ? 0xffffff : e.depth % 2 ? 0xff8a2e : 0xb98cff;
             // Overlapping additive flashes saturate to white fast: later links in a chain flash softer.
@@ -679,6 +759,7 @@ const t0 = performance.now();
 app.ticker.add((ticker) => {
     const now = performance.now();
     const dt = Math.min(0.1, ticker.deltaMS / 1000);
+    if (rotateLock) return; // short mobile landscape: everything waits behind the rotate overlay
     fps += (1000 / Math.max(1, ticker.deltaMS) - fps) * 0.05;
     frames++;
     const frozen = juice.isFrozen(now);
@@ -730,8 +811,10 @@ app.ticker.add((ticker) => {
     arena.world.pivot.set(0, 0);
     arena.world.rotation = juice.shakeRot;
     hud.update(world, arena.pal, dt, gyro.status, gyro.angle);
+    drawJoystick();
     hud.updateTitle(world.clock.beats, world.clock.bpm, demo === 'off' ? ATTRACT_AFTER - titleIdle : 0);
     hud.fpsText.text = `${Math.round(fps)} FPS · seed ${seed}`;
+    hud.fpsText.visible = !hud.compact || params.has('fps'); // phones: no debug text on the arena
 });
 
 if (params.has('play')) flow.send('START'); // dev shortcut: skip the title screen
@@ -756,12 +839,17 @@ function makeDebug() {
             theme: world.theme,
             bpm: world.clock.bpm,
             beats: world.clock.beats,
+            /** ms until the next beat (e2e times its shifts with it: off-beat shifts lock you out). */
+            toBeatMs: (1 - world.clock.phase) * world.clock.period * 1000,
             musicNotes: music.scheduled,
             audioReady: audio.ready,
             realm: world.player.realm,
             realmBlend: arena.realmT,
             demo,
             demoCaption,
+            rotateLock,
+            simTime: world.time,
+            touch: { movePointerId, joyX: joyNow.x - joyOrigin.x, joyY: joyNow.y - joyOrigin.y },
             calm,
             muted: audio.muted,
             status: hud.statusLine,
@@ -830,6 +918,11 @@ function makeDebug() {
             world.god = god;
         },
         startDemo: (mode: 'attract' | 'tour') => startDemo(mode),
+        /** Player position on screen (e2e: "drag up moves up" on the rotated portrait arena). */
+        playerScreen: () => {
+            const g = arena.world.toGlobal({ x: world.player.x, y: world.player.y });
+            return { x: g.x, y: g.y };
+        },
         stopDemo: () => stopDemo(),
         toTitle: () => toTitle(),
         /** Visible overlays (screen rects) + live combat labels, for the e2e overlap check. */
@@ -843,8 +936,7 @@ function makeDebug() {
             return rects;
         },
         layoutReport: () => {
-            const arenaRect = { x: arena.x, y: arena.y, w: ARENA_W * arenaScale, h: ARENA_H * arenaScale };
-            return { screen: { w: app.screen.width, h: app.screen.height }, arena: arenaRect, hud: hud.layoutReport() };
+            return { screen: { w: app.screen.width, h: app.screen.height }, arena: { ...arenaRect }, rotated: arena.rotation !== 0, hud: hud.layoutReport(), draft: draftView.layoutReport() };
         },
         hazards: () => world.hazards.map((h) => ({ x: h.x, y: h.y, realm: h.realm, revealed: h.revealed })),
         switches: () => world.switches.map((s) => ({ x: s.x, y: s.y, held: s.held })),

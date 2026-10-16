@@ -1,4 +1,4 @@
-import { Container, Graphics, Sprite, Text } from 'pixi.js';
+import { Container, Graphics, Rectangle, Sprite, Text } from 'pixi.js';
 import gsap from 'gsap';
 import { SUITS, type Suit } from '../engine/types';
 import { SUIT_INFO } from '../engine/Upgrades';
@@ -51,12 +51,15 @@ export class DraftView extends Container {
     private t = 0;
     private readonly tallyPerks: Record<Suit, Text>;
     onCardTap: (i: number) => void = () => {};
+    /** Tap/click outside the cards = SPACE (slam-stop / skip). Phones have no SPACE key. */
+    onBackgroundTap: () => void = () => {};
 
     constructor(tex: Textures) {
         super();
         this.tex = tex;
         this.visible = false;
         this.dim.eventMode = 'static'; // swallow clicks behind the overlay
+        this.dim.on('pointertap', () => this.onBackgroundTap());
         this.title.anchor.set(0.5);
         this.subtitle.anchor.set(0.5);
         this.addChild(this.dim, this.title, this.subtitle, this.grid, this.tally, this.award);
@@ -83,9 +86,13 @@ export class DraftView extends Container {
             c.position.set(homeX, homeY);
             c.eventMode = 'static';
             c.cursor = 'pointer';
+            // Hit-test the card face only: the glow sprites are ~3x the card and Pixi hit-tests
+            // alpha-0 children, which made taps NEAR a card flip it.
+            c.hitArea = new Rectangle(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H);
+            c.interactiveChildren = false;
             c.label = `card-${i}`;
             c.on('pointertap', () => this.onCardTap(i));
-            c.on('pointerover', () => (this.cards[i].hover = true));
+            c.on('pointerover', (e) => (this.cards[i].hover = e.pointerType === 'mouse')); // no "hover" on touch
             c.on('pointerout', () => (this.cards[i].hover = false));
             this.cards.push({ c, glow, hot, face, homeX, homeY, hover: false });
             this.grid.addChild(c);
@@ -119,22 +126,62 @@ export class DraftView extends Container {
     layout(w: number, h: number) {
         this.dim.clear();
         this.dim.rect(0, 0, w, h).fill({ color: 0x05020c, alpha: 0.82 });
-        const scale = Math.min(1, (h - 220) / (ROWS * CARD_H + (ROWS - 1) * GAP), (w - 40) / (COLS * CARD_W + (COLS - 1) * GAP));
-        this.grid.scale.set(scale);
-        this.grid.position.set(w / 2, h / 2 - 4);
-        const gridH = (ROWS * CARD_H + (ROWS - 1) * GAP) * scale;
-        const textFit = Math.min(1, (w - 24) / 740);
-        this.title.scale.set(textFit);
-        this.subtitle.scale.set(textFit);
+        // Stack header / 4x3 grid / suit footer so each part fits STRICTLY inside the screen.
+        const narrow = w < 600;
+        const pad = 12;
+        // Footer: 4 across on wide screens, 2x2 on phones.
+        SUITS.forEach((s, i) => {
+            const col = narrow ? i % 2 : i;
+            const row = narrow ? Math.floor(i / 2) : 0;
+            const x = narrow ? (col - 0.5) * 190 : (i - 1.5) * 180;
+            this.tallyTexts[s].position.set(x, row * 52);
+            this.tallyPerks[s].position.set(x, row * 52 + 14);
+        });
+        const footW = narrow ? 380 : 740;
+        const footH = narrow ? 52 + 34 : 34;
+        const fs = Math.min(1, (w - pad * 2) / footW);
+        this.tally.scale.set(fs);
+        // Header: title + up to two subtitle lines.
+        const hs = Math.min(1, (w - pad * 2) / (narrow ? 470 : 740));
+        this.title.scale.set(hs);
+        this.subtitle.scale.set(hs);
         this.subtitle.style.wordWrap = true;
-        this.subtitle.style.wordWrapWidth = 720;
+        this.subtitle.style.wordWrapWidth = (w - pad * 2) / hs;
         this.subtitle.style.align = 'center';
-        this.tally.scale.set(textFit);
-        this.award.scale.set(textFit);
-        this.title.position.set(w / 2, h / 2 - 4 - gridH / 2 - 62 * textFit);
-        this.subtitle.position.set(w / 2, h / 2 - 4 - gridH / 2 - 26 * textFit);
-        this.tally.position.set(w / 2, h / 2 - 4 + gridH / 2 + 26 * textFit);
-        this.award.position.set(w / 2, h / 2 + 8);
+        const top = pad + (narrow ? 8 : 0);
+        this.title.position.set(w / 2, top + 26 * hs);
+        this.subtitle.anchor.set(0.5, 0);
+        this.subtitle.position.set(w / 2, top + 54 * hs);
+        const headerBottom = top + 54 * hs + 2 * 20 * hs + 8;
+        const footerTop = h - pad - footH * fs;
+        this.tally.position.set(w / 2, footerTop + 10 * fs);
+        // Grid between them.
+        const gridW = COLS * CARD_W + (COLS - 1) * GAP;
+        const gridH = ROWS * CARD_H + (ROWS - 1) * GAP;
+        const availH = footerTop - 10 - headerBottom;
+        const scale = Math.min(1.25, availH / gridH, (w - pad * 2) / gridW);
+        this.grid.scale.set(scale);
+        this.grid.position.set(w / 2, headerBottom + availH / 2);
+        this.award.scale.set(Math.min(1, (w - pad * 2) / 620));
+        this.award.position.set(w / 2, headerBottom + availH / 2);
+    }
+
+    /** Screen rects of the draft's parts (e2e: zero overlap, all on screen). */
+    layoutReport() {
+        const box = (c: Container) => {
+            const b = c.getBounds();
+            return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) };
+        };
+        const g = this.grid;
+        const gw = (COLS * CARD_W + (COLS - 1) * GAP) * g.scale.x;
+        const gh = (ROWS * CARD_H + (ROWS - 1) * GAP) * g.scale.y;
+        return {
+            title: box(this.title),
+            subtitle: box(this.subtitle),
+            grid: { x: Math.round(g.x - gw / 2), y: Math.round(g.y - gh / 2), w: Math.round(gw), h: Math.round(gh) },
+            tally: box(this.tally),
+            cardW: Math.round(CARD_W * g.scale.x),
+        };
     }
 
     setSubtitle(text: string) {

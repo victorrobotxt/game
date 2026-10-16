@@ -626,8 +626,8 @@ cd chameleon-prototype
 npm install
 npm run dev            # http://localhost:5173  (phone: http://<LAN-IP>:5173/controller.html)
 npm run dev:https      # same, self-signed TLS, needed for phone tilt (see 9.4)
-npm test               # 19 vitest tests (engine rules, coin vacuum, attract bot, FSM/SequenceRunner stress)
-npm run e2e            # live browser playtest, 59 checks, writes ./screenshots/
+npm test               # 23 vitest tests (engine rules, difficulty, coin vacuum, attract bot, FSM/SequenceRunner stress)
+npm run e2e            # live browser playtest, 68 checks, writes ./screenshots/
 npm run check          # tsc + vitest + e2e: run this before every demo
 ```
 
@@ -683,6 +683,10 @@ e2e/playtest.mjs                   ← Playwright playtest
 
 **Core loop (the hook):** enemies chase you in *both* realms but only avoid runes of *their own* realm. Lure a solar enemy across a shadow rune and it **transmutes**. Every death is a blast that damages enemies of *either* realm, which is what makes chains cascade. Shifting on the beat (the preset's BPM, ±130 ms) builds a combo and a stronger shockwave. The rhythm is shown on the player: a ring closes onto the alchemist and flashes inside the PERFECT window, an arc shows the cooldown, and pips show the combo.
 
+**Difficulty (arcade tension from wave 1):** 3 starting flasks (HEARTS tiers grow it to 6); shield regen halved and paused for 4 s after a hit; enemies 40 % faster with 45 % faster spawns and a 5-foe opening burst from all edges; an enemy of the realm you are IN that gets within 160 px shudders for 0.25 s (red warning arrow) then lunges at 1.6× (shifting away cancels the windup); a shift outside the GOOD window (±220 ms) still shifts but shows MISTIMED! and locks shifting for 1.25 s (red cooldown arc). Constants live at the top of `World.ts`.
+
+**Phones:** portrait screens (`w/h < 0.85`) rotate the arena 90° so it fills ~70–77 % of the height; all movement input (keys, joystick, phone pad, tilt) is converted screen→arena so up is always up, and floating labels stay upright. Touch is tracked by `pointerId`: thumb 1 is a floating joystick, any second finger is SPACE on pointerdown without disturbing thumb 1, a quick lone tap is SPACE, and tapping outside the draft cards slam-stops/skips. Short touch landscape (`innerHeight < 520`) shows a ROTATE PHONE TO PORTRAIT overlay and pauses everything. `index.html` disables selection, the iOS callout, drag, tap highlight, touch-action and overscroll; `contextmenu`/`selectstart`/`dragstart`/`gesturestart` and canvas `touchstart`/`touchmove` are prevented.
+
 **Teaching it:** in waves 1–2 a coach line walks through (1) shift on the beat, (2) lure foes over the *other* realm's runes, (3) chain PERFECT shifts. Any rune that a foe of the other realm is about to cross flashes and grows a tightening warning ring.
 
 ### 9.3 The five presets (`Keys 1–5`)
@@ -724,7 +728,8 @@ The test starts its own Vite on :5199 (or reuses one: `E2E_URL=http://localhost:
 9. 20 coins fill GRAND and trigger the draft; Crown, Frog and Cash Bomb cameos.
 10. The guided tour is sampled every ~150 ms for 12 s: the tour pill, tour caption, preset banner, centre popup and top HUD may never overlap, and no combat label may sit on the banner. Death shows the results card; SPACE rewinds; ESC goes to the title; `T` runs the tour (bot plays, captions, preset 2 on cue); any key hands back; attract mode plays by itself; a click ends it.
 11. **Narrow screens:** 375×667 (touch, tap to start, theme button tap, title ≥ 24 px inside its frame) and 900×500. Every HUD part must be on-screen with no overlaps, buttons must fit their labels, and the arena must sit between the bars.
-12. **Zero `pageerror`, zero `console.error`, zero console warnings.**
+12. **iPhone:** 390×844 portrait: selection/callout CSS and handlers, rotated arena > 68 % of the height, "drag up moves up", **real two-finger CDP touch** (thumb 1 holds a drag, thumb 2 taps and lifts: realm shifts and thumb 1 keeps moving), the draft fits with zero overlap (also at 1280×720), tapping outside the cards slam-stops. 844×390 touch landscape shows the rotate lock with the sim paused. Note: CDP `touchEnd` lists the points that *lift*, not the ones that remain.
+13. **Zero `pageerror`, zero `console.error`, zero console warnings.**
 
 Screenshots go to `screenshots/00-…10-*.png` (title, combat, shift, echo, lens, draft, phone, results, tour, 375 px, 900 px) and the full report to `screenshots/e2e-report.json`. The production bundle also passed all 57 checks of the previous revision (`npm run build && npm run preview`, then `E2E_URL=http://localhost:4173 npm run e2e`).
 
@@ -744,6 +749,7 @@ Screenshots go to `screenshots/00-…10-*.png` (title, combat, shift, echo, lens
 | Theme button width `(w − 600) / 5` | Negative below 600 px: the HUD fell apart on phones | Three layouts (wide / medium / compact < 900 px), short labels, a 375×667 + 900×500 overlap check in the e2e |
 | Homing coins pulled by a *force* | Fast coins fell into orbit round the player and were never collected | Steer the coin's velocity towards the player instead |
 | A sun-with-rays solar rune | Read as one more spiky solar enemy | Round seal for solar, diamond + crescent for shadow (shape, not only colour, tells realms apart) |
+| Draft card glow sprites (~3× the card) hit-tested at alpha 0 | Taps NEAR a card flipped it (desktop too); on phones you could not tap "outside" to slam-stop | Card `hitArea` = the card rect, `interactiveChildren = false`; hover lift is mouse-only |
 | Floor runes big and glowing, enemies small orbs | Players read the runes as the threat | Runes idle at ~35 % as engravings and only flare when a foe of the other realm closes in; enemies +35 % radius (engine `e.r` 14→19, brutes 22→30) with distinct silhouettes, eyes on the player, 3-dot trails and a beat-synced squash |
 | Tour caption at the top of the screen | Collided with the top HUD and the preset banner | Caption box (pill as its header) sits inside the bottom of the arena and fades out while a preset banner shows; combat labels are pushed off the banner |
 | `ensurePlaying()` returned the moment the flow was PLAYING | A cleared wave opened the draft ~0.9 s later and ate the next click | Require PLAYING to hold for ~1 s |

@@ -2,6 +2,8 @@ import type { Theme } from './types';
 
 /** ± seconds around a beat that count as an on-beat (PERFECT) shift. */
 export const PERFECT_WINDOW = 0.13;
+/** ± seconds that still count as on time (GOOD). Outside it a shift is MISTIMED and locks you out. */
+export const GOOD_WINDOW = 0.22;
 
 /** Each preset has its own tempo; the whole game (sim, music, HUD dials, player ring) follows it. */
 export const THEME_BPM: Record<Theme, number> = {

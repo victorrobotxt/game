@@ -29,6 +29,8 @@ export class DraftPresenter {
     private readonly tierOf: (s: Suit) => number;
     private onDone: (suit: Suit | null) => void = () => {};
     lastAward: Suit | null = null;
+    /** Word the prompts for taps. */
+    touch = false;
 
     constructor(view: DraftView, rng: Rng, audio: ProceduralAudio, tierOf: (s: Suit) => number) {
         this.view = view;
@@ -36,6 +38,7 @@ export class DraftPresenter {
         this.audio = audio;
         this.tierOf = tierOf;
         view.onCardTap = (i) => this.tapCard(i);
+        view.onBackgroundTap = () => this.primary();
     }
 
     get state(): DraftState | 'CLOSED' {
@@ -60,11 +63,11 @@ export class DraftPresenter {
                     this.queue.add('deal', (c) => c.play(view.deal((i) => this.audio.deal(i % 4))));
                     await this.queue.run();
                     view.pickable = true;
-                    view.setSubtitle('Match 3 of a suit  ·  click cards  ·  SPACE = slam-stop auto-reveal');
+                    view.setSubtitle(this.touch ? 'Match 3 of a suit  ·  tap cards  ·  tap outside = slam-stop' : 'Match 3 of a suit  ·  click cards  ·  SPACE = slam-stop auto-reveal');
                 },
                 autoReveal: async () => {
                     view.pickable = false;
-                    view.setSubtitle('SLAM STOP!  ·  SPACE again = skip');
+                    view.setSubtitle(this.touch ? 'SLAM STOP!  ·  tap again = skip' : 'SLAM STOP!  ·  SPACE again = skip');
                     for (const r of model.autoRevealPlan()) {
                         this.queue.add(`reveal-${r.index}`, async (c) => {
                             this.audio.cardFlip();

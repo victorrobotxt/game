@@ -84,6 +84,11 @@ try {
         await game.keyboard.up(key);
     };
     const shot = (name) => game.screenshot({ path: resolve(shots, name) });
+    /** Shifts outside the GOOD window lock shifting for 1.25 s, so time them like a player would. */
+    const onBeat = async (pg = game) => {
+        const ms = await pg.evaluate(() => window.__GAME_DEBUG__.snapshot().toBeatMs);
+        await sleep(Math.max(0, ms - 25));
+    };
     /** A cleared wave auto-opens the draft (world paused). Play through it like a user would. */
     const ensurePlaying = async () => {
     // Increase the stabilization sleep from 1100ms to 1500ms so wave-clear auto-drafts trigger before returning
@@ -160,7 +165,7 @@ try {
     await ensurePlaying();
     // ------------------------------------------------------------ 3. SPACE realm shift
     const realmBefore = s.realm;
-    await sleep(Math.max(0, 600 - (Date.now() % 600))); // roughly on the beat; not required to pass
+    await onBeat();
     await game.keyboard.press('Space');
     await sleep(60);
     s = await snap();
@@ -227,6 +232,7 @@ try {
     await sleep(2500);
     await ensurePlaying();
     const inst = (await snap()).score;
+    await onBeat();
     await game.keyboard.press('Space');
     await sleep(100);
     check('CHAIN_OVERLOAD: shifting vents instability for score', (await snap()).score > inst);
@@ -240,9 +246,11 @@ try {
     const sw = await dbg('switches');
     await hold('KeyD', 900);
     await hold('KeyW', 500);
+    await onBeat();
     await game.keyboard.press('Space');
     await hold('KeyA', 500);
     await hold('KeyS', 400);
+    await onBeat();
     await game.keyboard.press('Space');
     await game.keyboard.down('KeyD');
     await sleep(500);
@@ -310,6 +318,7 @@ try {
     await ensurePlaying();
     await sleep(2300); // let the WAVE popup and perk label fade
     // joystick on the phone moves the player
+    await ensurePlaying();
     const pad = await phone.locator('#pad').boundingBox();
     const before = (await snap()).player;
     await phone.mouse.move(pad.x + pad.width / 2, pad.y + pad.height / 2);
@@ -329,6 +338,7 @@ try {
     await game.keyboard.press('Digit1');
     await sleep(500);
     const r0 = (await snap()).realm;
+    await onBeat();
     await phone.locator('#shift').dispatchEvent('pointerdown');
     await game.waitForFunction((r) => window.__GAME_DEBUG__.snapshot().realm !== r, r0, { timeout: 2000 }).catch(() => {});
     check('phone SHIFT REALM button shifts the realm', (await snap()).realm !== r0);
@@ -342,7 +352,8 @@ try {
     const look1 = await phoneLook();
     s = await snap();
     check('phone mirrors the game (mode, realm, button label)', look1.mode === 'play' && look1.realm === s.realm && look1.label === 'SHIFT REALM', JSON.stringify(look1));
-    await sleep(500);
+    await sleep(1300); // clear any lockout from the phone-button shift
+    await onBeat();
     await game.keyboard.press('Space');
     await sleep(500);
     const look2 = await phoneLook();
@@ -471,14 +482,16 @@ try {
         watch(pg, `${vw}px`);
         await pg.goto(`${base}/?seed=3`);
         await pg.waitForFunction(() => !!window.__GAME_DEBUG__, null, { timeout: 30_000 });
+        await pg.evaluate(() => window.__GAME_DEBUG__.godMode(true)); // layout check, not a survival test
         await sleep(800);
         if (vw < 500) {
             await pg.screenshot({ path: resolve(shots, '09-narrow-375x667-title.png') });
             const tr = await pg.evaluate(() => window.__GAME_DEBUG__.layoutReport());
             const tm = tr.hud.titleMain;
-            const padL = tm.x - tr.arena.x;
-            const padR = tr.arena.x + tr.arena.w - (tm.x + tm.w);
-            check('375 px title fits its frame with >= 24 px padding', padL >= 24 && padR >= 24, `left ${Math.round(padL)} px, right ${Math.round(padR)} px`);
+            // Portrait: the title owns the full width (the rotated arena is narrower than it).
+            const padL = tm.x - 12;
+            const padR = vw - 12 - (tm.x + tm.w);
+            check('375 px title keeps >= 24 px padding inside its 12 px screen margin', padL >= 24 && padR >= 24, `left ${Math.round(padL)} px, right ${Math.round(padR)} px`);
             await pg.tap('canvas', { position: { x: vw / 2, y: vh / 2 } });
         } else await pg.keyboard.press('Space');
         await sleep(2600);
@@ -507,7 +520,119 @@ try {
         await ctx.close();
     }
 
-    // ------------------------------------------------------------ 12. health
+    // ------------------------------------------------------------ 12. iPhone: portrait 390x844 (multi-touch, no selection), landscape lock
+    {
+        const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
+        const pg = await ctx.newPage();
+        watch(pg, 'iphone');
+        await pg.goto(`${base}/?seed=8&tutorial=0`);
+        await pg.waitForFunction(() => !!window.__GAME_DEBUG__, null, { timeout: 30_000 });
+        const pdbg = (fn, ...args) => pg.evaluate(([f, a]) => window.__GAME_DEBUG__[f](...a), [fn, args]);
+        const psnap = () => pdbg('snapshot');
+        await sleep(600);
+        // No iOS selection / callout / context menu on the game surface.
+        const sel = await pg.evaluate(() => {
+            const c = document.querySelector('canvas');
+            const cs = getComputedStyle(c);
+            // Chromium drops the iOS-only -webkit-touch-callout from the CSSOM, so read the source.
+            const rules = [...document.querySelectorAll('style')].map((st) => st.textContent).join('\n');
+            const fire = (type) => c.dispatchEvent(new Event(type, { cancelable: true, bubbles: true }));
+            return {
+                userSelect: cs.userSelect || cs.webkitUserSelect,
+                touchAction: cs.touchAction,
+                calloutRule: /canvas[^{]*\{[^}]*-webkit-touch-callout:\s*none/.test(rules),
+                contextmenuBlocked: !fire('contextmenu'),
+                selectstartBlocked: !fire('selectstart'),
+                touchstartBlocked: !c.dispatchEvent(new TouchEvent('touchstart', { cancelable: true, bubbles: true })),
+            };
+        });
+        check('no iOS text selection / copy callout on the canvas (CSS + handlers)', sel.userSelect === 'none' && sel.touchAction === 'none' && sel.calloutRule && sel.contextmenuBlocked && sel.selectstartBlocked && sel.touchstartBlocked, JSON.stringify(sel));
+        await pg.tap('canvas', { position: { x: 195, y: 422 } });
+        await pdbg('godMode', true);
+        await sleep(400);
+        let rep = await pdbg('layoutReport');
+        const share = rep.arena.h / 844;
+        check('390x844 portrait: arena is rotated and fills > 68% of the height', rep.rotated && share > 0.68, `arena ${Math.round(rep.arena.w)}x${Math.round(rep.arena.h)} = ${(share * 100).toFixed(0)}% of 844`);
+        await pg.screenshot({ path: resolve(shots, '11-iphone-390x844-play.png') });
+
+        // Real two-finger input through CDP: thumb 1 drags and HOLDS, thumb 2 taps and lifts.
+        const cdp = await ctx.newCDPSession(pg);
+        const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points });
+        const t1 = (x, y) => ({ x, y, id: 1, radiusX: 4, radiusY: 4, force: 1 });
+        await pdbg('teleport', 600, 290);
+        await touch('touchStart', [t1(195, 600)]);
+        for (let i = 1; i <= 6; i++) {
+            await touch('touchMove', [t1(195, 600 - i * 12)]); // drag UP
+            await sleep(30);
+        }
+        await sleep(300);
+        const a0 = await pdbg('playerScreen');
+        const before = await psnap();
+        await sleep(300);
+        const a1 = await pdbg('playerScreen');
+        const realm0 = before.realm;
+        const t2 = { x: 320, y: 300, id: 2, radiusX: 4, radiusY: 4, force: 1 };
+        await touch('touchStart', [t1(195, 528), t2]); // thumb 2 down (CDP: touchStart lists all active points)
+        await sleep(80);
+        const mid = await psnap();
+        await touch('touchEnd', [t2]); // CDP: touchEnd lists the points that LIFT -> thumb 2 only
+        await sleep(60);
+        const b0 = await pdbg('playerScreen');
+        await sleep(400);
+        const b1 = await pdbg('playerScreen');
+        const after = await psnap();
+        await touch('touchEnd', [t1(195, 528)]);
+        await sleep(100);
+        const released = await psnap();
+        check('drag up on the rotated portrait arena moves the alchemist UP the screen', a1.y < a0.y - 20, `screen y ${a0.y.toFixed(0)} -> ${a1.y.toFixed(0)}`);
+        check('multi-touch: thumb 2 tap shifts realm without interrupting thumb 1', mid.realm !== realm0 && after.touch.movePointerId !== null && after.touch.movePointerId === before.touch.movePointerId && b1.y < b0.y - 20 && released.touch.movePointerId === null, `realm ${realm0} -> ${mid.realm}; after thumb 2 lifted moved ${(b0.y - b1.y).toFixed(0)} px up; stick id ${before.touch.movePointerId}/${after.touch.movePointerId}/${released.touch.movePointerId}`);
+
+        // Jackpot Cards must fit the phone with zero overlap.
+        await pdbg('triggerDraft');
+        await pg.waitForFunction(() => window.__GAME_DEBUG__.snapshot().draft === 'PICKING', null, { timeout: 6000 }).catch(() => {});
+        await pdbg('flipCard', 1);
+        await sleep(500);
+        rep = await pdbg('layoutReport');
+        const draftProblems = (d, vw, vh) => {
+            const parts = Object.entries(d).filter(([k]) => k !== 'cardW');
+            const out = [];
+            for (const [k, b] of parts) if (b.x < 0 || b.y < 0 || b.x + b.w > vw + 1 || b.y + b.h > vh + 1) out.push(`${k} off-screen`);
+            for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) if (rectHit(parts[i][1], parts[j][1])) out.push(`${parts[i][0]}×${parts[j][0]}`);
+            return out;
+        };
+        const dp = draftProblems(rep.draft, 390, 844);
+        check('390x844: Jackpot Cards header / 4x3 grid / suit footer fit with zero overlap', dp.length === 0 && rep.draft.cardW >= 70, dp.join(', ') || `cards ${rep.draft.cardW}px wide`);
+        await pg.screenshot({ path: resolve(shots, '12-iphone-390x844-draft.png') });
+        await pg.tap('canvas', { position: { x: 5, y: rep.draft.grid.y + rep.draft.grid.h / 2 } }); // margin beside the cards
+        await sleep(150);
+        check('phone: tapping outside the cards slam-stops the draft', ['REVEALING', 'AWARDING'].includes((await psnap()).draft), (await psnap()).draft);
+        await ctx.close();
+
+        // The desktop draft obeys the same rule.
+        await ensurePlaying();
+        await game.keyboard.press('KeyJ');
+        await waitFor(() => window.__GAME_DEBUG__.snapshot().draft === 'PICKING', 6000).catch(() => {});
+        const dd = draftProblems((await dbg('layoutReport')).draft, 1280, 720);
+        check('1280x720: Jackpot Cards layout fits with zero overlap', dd.length === 0, dd.join(', '));
+        await ensurePlaying();
+        check('desktop 1280x720 never shows the rotate lock', (await snap()).rotateLock === false);
+
+        const lctx = await browser.newContext({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
+        const lp = await lctx.newPage();
+        watch(lp, 'landscape');
+        await lp.goto(`${base}/?seed=8&play`);
+        await lp.waitForFunction(() => !!window.__GAME_DEBUG__, null, { timeout: 30_000 });
+        await sleep(400);
+        const l0 = await lp.evaluate(() => window.__GAME_DEBUG__.snapshot());
+        await sleep(600);
+        const l1 = await lp.evaluate(() => window.__GAME_DEBUG__.snapshot());
+        const overlay = await lp.evaluate(() => ({ display: getComputedStyle(document.getElementById('rotate')).display, text: document.getElementById('rotate').innerText }));
+        check('844x390 phone landscape: "ROTATE PHONE TO PORTRAIT" lock, simulation paused', l1.rotateLock && overlay.display === 'flex' && /ROTATE PHONE TO PORTRAIT/.test(overlay.text) && l1.simTime === l0.simTime, `display=${overlay.display} simTime ${l0.simTime.toFixed(2)} -> ${l1.simTime.toFixed(2)}`);
+        await lp.screenshot({ path: resolve(shots, '13-iphone-landscape-844x390-lock.png') });
+        await lctx.close();
+    }
+
+    // ------------------------------------------------------------ 13. health
     await sleep(500);
     const px2 = await dbg('samplePixels');
     check('still rendering after full playtest', px2.uniqueColors > 60, `${px2.uniqueColors} colours`);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ARENA_H, ARENA_W, COIN_LIFE, World } from '../src/engine/World';
+import { ARENA_H, ARENA_W, COIN_LIFE, ENEMY_SPEED_MUL, LUNGE_MUL, MISTIME_LOCK, OPENING_BURST, SHIELD_DELAY, World } from '../src/engine/World';
 import { Bot } from '../src/engine/Bot';
 import { THEME_BPM } from '../src/engine/BeatClock';
 import { JackpotCardsDraft } from '../src/engine/easter-eggs/JackpotCardsDraft';
@@ -203,6 +203,66 @@ describe('portfolio cameos', () => {
         w.spawnCoin(ARENA_W - 40, ARENA_H - 40);
         const hops = run(w, 3).filter((x) => x.type === 'FROG_HOP');
         expect(hops.length).toBeGreaterThan(3);
+    });
+});
+
+describe('difficulty', () => {
+    it('3 starting flasks (HEARTS grows it to 6), 5-foe opening burst, faster foes', () => {
+        const w = new World(31);
+        expect(w.stats.maxHp).toBe(3);
+        w.applyTiers({ CLUBS: 0, DIAMONDS: 0, HEARTS: 9, SPADES: 0 });
+        expect(w.stats.maxHp).toBe(6);
+        const v = new World(32);
+        v.startWave();
+        expect(v.activeEnemies).toBe(OPENING_BURST);
+        const e = v.enemies.find((x) => x.active)!;
+        expect(e.speed).toBeGreaterThan(70 * ENEMY_SPEED_MUL);
+    });
+
+    it('a same-realm foe telegraphs, then lunges at 1.6x; shifting away cancels the windup', () => {
+        const w = new World(33);
+        w.god = true;
+        const e = w.spawnEnemy(w.player.x + 120, w.player.y, Realm.SOLAR_ORDER)!;
+        e.lungeCd = 0;
+        const ev = run(w, 0.75); // spawn grace (0.5 s), then the telegraph
+        expect(ev.some((x) => x.type === 'ENEMY_TELEGRAPH')).toBe(true);
+        while (e.windup > 0) run(w, 1 / 60);
+        run(w, 0.2);
+        expect(e.lunge).toBeGreaterThan(0);
+        expect(Math.hypot(e.vx, e.vy)).toBeGreaterThan(e.speed * 1.4);
+        expect(LUNGE_MUL).toBe(1.6);
+
+        const g = new World(34);
+        const f = g.spawnEnemy(g.player.x + 120, g.player.y, Realm.SOLAR_ORDER)!;
+        f.spawnT = 1;
+        f.lungeCd = 0;
+        run(g, 0.05);
+        expect(f.windup).toBeGreaterThan(0);
+        g.clock.beats = 4 - g.clock.bpm / 3600;
+        g.step(shift); // into SHADOW: the solar foe can no longer touch us
+        run(g, 0.3);
+        expect(f.lunge).toBe(0);
+    });
+
+    it('an off-beat shift still shifts but locks shifting for 1.25 s', () => {
+        const w = new World(35);
+        w.clock.beats = 4.5; // half a beat off
+        w.step(shift);
+        const ev = w.drainEvents();
+        expect(w.player.realm).toBe(Realm.SHADOW_ALCHEMY);
+        expect(ev.some((x) => x.type === 'MISTIMED')).toBe(true);
+        expect(w.player.shiftCd).toBeGreaterThan(MISTIME_LOCK - 0.05); // one step already ticked off
+    });
+
+    it('shield regen waits 4 s after a hit', () => {
+        const w = new World(36);
+        w.player.shield = 0;
+        w.hurtPlayer(1);
+        w.player.shield = 0;
+        run(w, SHIELD_DELAY - 0.5);
+        expect(w.player.shield).toBe(0);
+        run(w, 2);
+        expect(w.player.shield).toBeGreaterThan(0);
     });
 });
 

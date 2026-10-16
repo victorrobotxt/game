@@ -318,13 +318,13 @@ export class HudView extends Container {
         // compact (< 900 px): two-row bars, short theme labels.
         const compact = (this.compact = w < 900);
         const medium = !compact && w < WIDE_AT;
-        const top = (this.topH = compact ? 100 : 64);
-        const bot = (this.bottomH = compact ? 100 : 64);
+        const top = (this.topH = compact ? 92 : 64);
+        const bot = (this.bottomH = compact ? 96 : 64);
 
         // ---- top
         this.scoreLabel.position.set(compact ? 12 : 22, compact ? 6 : 10);
-        this.score.position.set(compact ? 10 : 20, compact ? 32 : 38);
-        this.score.scale.set(compact ? 0.85 : 1);
+        this.score.position.set(compact ? 10 : 20, compact ? 28 : 38);
+        this.score.scale.set(compact ? 0.78 : 1);
         this.realmText.position.set(compact ? 132 : 160, compact ? 8 : 10);
         this.waveText.position.set(compact ? 132 : 160, compact ? 28 : 30);
         const linkW = 450;
@@ -427,7 +427,8 @@ export class HudView extends Container {
             const b = c.getBounds();
             return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) };
         };
-        const parts: Record<string, Container> = { score: this.score, realm: this.realmText, link: this.link, hp: this.hpBox, widget: this.widgetBox, fps: this.fpsText };
+        const parts: Record<string, Container> = { score: this.score, realm: this.realmText, link: this.link, hp: this.hpBox, widget: this.widgetBox };
+        if (this.fpsText.visible) parts.fps = this.fpsText;
         if (this.coach.alpha > 0.05) parts.coach = this.coach;
         if (this.clockBox.visible) parts.clock = this.clockBox;
         if (this.gyroBox.visible) parts.gyro = this.gyroBox;
@@ -567,7 +568,7 @@ export class HudView extends Container {
     setTouch(on: boolean) {
         if (!on) return;
         this.titlePress.text = 'TAP TO START';
-        this.titleHelp.text = 'tap = shift realms on the beat  ·  hold & drag = move\ntheme buttons below  ·  rotate the phone for a bigger arena';
+        this.titleHelp.text = 'thumb 1: hold & drag to move  ·  thumb 2: tap to shift realms\non the beat  ·  theme buttons below';
     }
 
     get titleVisible(): boolean {

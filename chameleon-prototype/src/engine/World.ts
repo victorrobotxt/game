@@ -4,7 +4,7 @@
  * The view reads the public arrays every frame and reacts to `events`.
  */
 import { Rng } from './rng';
-import { BeatClock, PERFECT_WINDOW, THEME_BPM } from './BeatClock';
+import { BeatClock, GOOD_WINDOW, PERFECT_WINDOW, THEME_BPM } from './BeatClock';
 import {
     Element,
     PowerUpKind,
@@ -42,6 +42,21 @@ export const MAX_ECHOES = 3;
 export const MAX_POWERUPS = 4;
 /** Uncollected coins fade out after this many seconds, so the arena never fills with gold. */
 export const COIN_LIFE = 9;
+// ---- difficulty (arcade tension from wave 1)
+export const ENEMY_SPEED_MUL = 1.4;
+export const SPAWN_RATE_MUL = 1.45;
+/** Enemies dropped in at once when a wave starts, converging from the edges. */
+export const OPENING_BURST = 5;
+/** Same-realm enrage lunge: range, telegraph, speed multiplier, duration, cooldown. */
+export const LUNGE_RANGE = 160;
+export const LUNGE_WINDUP = 0.25;
+export const LUNGE_MUL = 1.6;
+export const LUNGE_TIME = 0.55;
+export const LUNGE_CD = 1.5;
+/** A shift outside the GOOD window locks shifting for this long. */
+export const MISTIME_LOCK = 1.25;
+/** Shield regen waits this long after a hit. */
+export const SHIELD_DELAY = 4;
 /** A cascade of at least this many blasts auto-collects every coin on the floor. */
 export const VACUUM_CHAIN = 3;
 
@@ -81,6 +96,13 @@ export interface Enemy {
     revealed: boolean;
     spawnT: number;
     contactCd: number;
+    /** Lunge telegraph seconds left (> 0 = winding up; the view shakes and reddens it). */
+    windup: number;
+    /** Lunge seconds left, along (lungeX, lungeY). */
+    lunge: number;
+    lungeCd: number;
+    lungeX: number;
+    lungeY: number;
 }
 
 export interface Coin {
@@ -201,6 +223,8 @@ export class World {
 
     private spawnQueue = 0;
     private spawnTimer = 0;
+    /** Seconds since the player was last hurt (shield regen waits SHIELD_DELAY). */
+    sinceHurt = 99;
     private nextEnemyId = 1;
     private nextChainId = 1;
     private readonly chainCounts = new Map<number, number>();
@@ -229,6 +253,7 @@ export class World {
             this.enemies.push({
                 active: false, id: 0, x: 0, y: 0, vx: 0, vy: 0, realm: Realm.SOLAR_ORDER, hp: 0, maxHp: 0,
                 r: 19, speed: 0, brute: false, flash: 0, revealed: false, spawnT: 0, contactCd: 0,
+                windup: 0, lunge: 0, lungeCd: 0, lungeX: 0, lungeY: 0,
             });
         for (let i = 0; i < MAX_COINS; i++) this.coins.push({ active: false, x: 0, y: 0, vx: 0, vy: 0, age: 0, homing: false });
         for (let i = 0; i < MAX_BLASTS; i++)
@@ -294,8 +319,12 @@ export class World {
     startWave() {
         this.wave++;
         this.spawnQueue = 5 + this.wave * 2;
-        this.spawnTimer = 0.2;
+        this.spawnTimer = 0.6;
         this.emit({ type: 'WAVE_START', wave: this.wave });
+        // Opening burst: several foes converge from all four edges at once.
+        const burst = Math.min(OPENING_BURST, this.spawnQueue);
+        for (let i = 0; i < burst; i++) this.spawnFromEdge(i % 4);
+        this.spawnQueue -= burst;
     }
 
     get activeEnemies(): number {
@@ -383,11 +412,15 @@ export class World {
         const from = p.realm;
         p.realm = otherRealm(p.realm);
         p.shiftCd = this.stats.shiftCooldown;
-        const perfect = this.beatError() <= PERFECT_WINDOW;
+        const err = this.beatError();
+        const perfect = err <= PERFECT_WINDOW;
+        const mistimed = err > GOOD_WINDOW;
+        if (mistimed) p.shiftCd = MISTIME_LOCK; // panic-mashing gets you trapped
         this.combo = perfect ? this.combo + 1 : 0;
         this.bestCombo = Math.max(this.bestCombo, this.combo);
         const radius = 150 + (perfect ? 50 + Math.min(this.combo, 8) * 6 : 0);
         this.emit({ type: 'SHIFT', realm: p.realm, perfect, combo: this.combo, x: p.x, y: p.y, radius });
+        if (mistimed) this.emit({ type: 'MISTIMED', x: p.x, y: p.y, lock: MISTIME_LOCK });
 
         for (const e of this.enemies) {
             if (!e.active) continue;
@@ -499,6 +532,7 @@ export class World {
             p.hp = Math.max(0, p.hp - dmg);
         }
         p.invuln = 0.9;
+        this.sinceHurt = 0;
         this.combo = 0;
         this.emit({ type: 'PLAYER_HURT', hp: p.hp });
     }
@@ -510,7 +544,8 @@ export class World {
         p.crown = Math.max(0, p.crown - dt);
         this.lensFlareCd = Math.max(0, this.lensFlareCd - dt);
         this.switchCd = Math.max(0, this.switchCd - dt);
-        p.shield = Math.min(this.stats.shieldMax, p.shield + this.stats.shieldRegenPerSec * dt);
+        this.sinceHurt += dt;
+        if (this.sinceHurt > SHIELD_DELAY) p.shield = Math.min(this.stats.shieldMax, p.shield + this.stats.shieldRegenPerSec * dt);
         this.coinStreakT -= dt;
         if (this.coinStreakT <= 0) this.coinStreak = 0;
     }
@@ -521,9 +556,12 @@ export class World {
         if (this.spawnQueue <= 0) return;
         this.spawnTimer -= dt;
         if (this.spawnTimer > 0) return;
-        this.spawnTimer = Math.max(0.25, 0.9 - this.wave * 0.05);
+        this.spawnTimer = Math.max(0.25, 0.9 - this.wave * 0.05) / SPAWN_RATE_MUL;
         this.spawnQueue--;
-        const edge = this.rng.int(4);
+        this.spawnFromEdge(this.rng.int(4));
+    }
+
+    private spawnFromEdge(edge: number) {
         const x = edge === 0 ? 20 : edge === 1 ? ARENA_W - 20 : this.rng.range(40, ARENA_W - 40);
         const y = edge === 2 ? 20 : edge === 3 ? ARENA_H - 20 : this.rng.range(40, ARENA_H - 40);
         const realm = this.rng.next() < 0.5 ? Realm.SOLAR_ORDER : Realm.SHADOW_ALCHEMY;
@@ -543,7 +581,9 @@ export class World {
         e.brute = brute;
         e.maxHp = e.hp = brute ? 4 : 1 + Math.floor(this.wave / 4);
         e.r = brute ? 30 : 19; // big enough to read instantly against the floor runes
-        e.speed = (brute ? 55 : 80) + Math.min(this.wave, 10) * 6 + this.rng.range(-8, 8);
+        e.speed = ((brute ? 55 : 80) + Math.min(this.wave, 10) * 6 + this.rng.range(-8, 8)) * ENEMY_SPEED_MUL;
+        e.windup = e.lunge = 0;
+        e.lungeCd = 1;
         e.flash = 0;
         e.revealed = true;
         e.spawnT = 0;
@@ -592,7 +632,34 @@ export class World {
                     ay += (sy / s) * 60;
                 }
             }
-            const k = 1 - Math.exp(-dt * 3);
+            // Same-realm enrage: close in, telegraph, then lunge. Shifting realm cancels the windup.
+            e.lungeCd = Math.max(0, e.lungeCd - dt);
+            const canHurt = lens ? e.realm === Realm.SOLAR_ORDER || e.revealed : e.realm === p.realm;
+            let snap = 3;
+            if (e.lunge > 0) {
+                e.lunge -= dt;
+                ax = e.lungeX * e.speed * LUNGE_MUL;
+                ay = e.lungeY * e.speed * LUNGE_MUL;
+                snap = 14;
+            } else if (e.windup > 0) {
+                if (!canHurt) e.windup = 0;
+                else {
+                    e.windup -= dt;
+                    ax *= 0.15;
+                    ay *= 0.15;
+                    snap = 10;
+                    if (e.windup <= 0) {
+                        e.lunge = LUNGE_TIME;
+                        e.lungeX = dx / d;
+                        e.lungeY = dy / d;
+                    }
+                }
+            } else if (canHurt && e.lungeCd <= 0 && e.spawnT > 0.5 && d < LUNGE_RANGE) {
+                e.windup = LUNGE_WINDUP;
+                e.lungeCd = LUNGE_CD + LUNGE_WINDUP + LUNGE_TIME;
+                this.emit({ type: 'ENEMY_TELEGRAPH', x: e.x, y: e.y });
+            }
+            const k = 1 - Math.exp(-dt * snap);
             e.vx += (ax - e.vx) * k;
             e.vy += (ay - e.vy) * k;
             e.x += e.vx * dt;
@@ -1026,6 +1093,7 @@ export class World {
         this.frog.active = false;
         this.score = this.wave = this.combo = this.linkCoins = this.totalCoins = this.instability = 0;
         this.bestCombo = this.bestChain = this.lureKills = 0;
+        this.sinceHurt = 99;
         this.coinStreak = 0;
         this.gameOver = false;
         this.spawnQueue = 0;
