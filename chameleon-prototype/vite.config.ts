@@ -8,6 +8,7 @@ import { gyroRelay } from './vite-plugin-gyro-relay.ts';
 const https = process.env.HTTPS === '1';
 
 export default defineConfig({
+    base: './',
     plugins: [gyroRelay(), https && basicSsl()] as PluginOption[],
     server: { host: true, port: 5173 },
     build: {
