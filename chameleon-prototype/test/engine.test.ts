@@ -57,8 +57,26 @@ describe('dual-realm core', () => {
         expect(killedRealms.size).toBe(2);
     });
 
-    it('a cleared wave asks for the Jackpot Cards draft', () => {
+    it('waves 1-2 roll straight on; only every 3rd cleared wave asks for the Jackpot Cards draft', () => {
+        const w = new World(6);
+        w.god = true;
+        w.startWave();
+        const triggers: number[] = [];
+        for (let t = 0; t < 60 * 30 && w.wave < 4; t++) {
+            if (w.activeEnemies > 0) w.debugClearWave();
+            w.step(idle);
+            for (const e of w.drainEvents()) if (e.type === 'JACKPOT_TRIGGER') {
+                triggers.push(w.wave);
+                w.startWave(); // what the draft's exit does
+            }
+        }
+        expect(w.wave).toBeGreaterThanOrEqual(4);
+        expect(triggers).toEqual([3]);
+    });
+
+    it('a cleared wave 3 asks for the Jackpot Cards draft', () => {
         const w = new World(5);
+        w.wave = 2;
         w.startWave();
         const ev = run(w, 0.1);
         expect(ev.some((e) => e.type === 'WAVE_START')).toBe(true);

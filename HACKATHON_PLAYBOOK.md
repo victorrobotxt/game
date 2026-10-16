@@ -626,8 +626,8 @@ cd chameleon-prototype
 npm install
 npm run dev            # http://localhost:5173  (phone: http://<LAN-IP>:5173/controller.html)
 npm run dev:https      # same, self-signed TLS, needed for phone tilt (see 9.4)
-npm test               # 23 vitest tests (engine rules, difficulty, coin vacuum, attract bot, FSM/SequenceRunner stress)
-npm run e2e            # live browser playtest, 68 checks, writes ./screenshots/
+npm test               # 24 vitest tests (engine rules, difficulty, coin vacuum, attract bot, FSM/SequenceRunner stress)
+npm run e2e            # live browser playtest, 74 checks, writes ./screenshots/
 npm run check          # tsc + vitest + e2e: run this before every demo
 ```
 
@@ -685,7 +685,9 @@ e2e/playtest.mjs                   ← Playwright playtest
 
 **Difficulty (arcade tension from wave 1):** 3 starting flasks (HEARTS tiers grow it to 6); shield regen halved and paused for 4 s after a hit; enemies 40 % faster with 45 % faster spawns and a 5-foe opening burst from all edges; an enemy of the realm you are IN that gets within 160 px shudders for 0.25 s (red warning arrow) then lunges at 1.6× (shifting away cancels the windup); a shift outside the GOOD window (±220 ms) still shifts but shows MISTIMED! and locks shifting for 1.25 s (red cooldown arc). Constants live at the top of `World.ts`.
 
-**Phones:** portrait screens (`w/h < 0.85`) rotate the arena 90° so it fills ~70–77 % of the height; all movement input (keys, joystick, phone pad, tilt) is converted screen→arena so up is always up, and floating labels stay upright. Touch is tracked by `pointerId`: thumb 1 is a floating joystick, any second finger is SPACE on pointerdown without disturbing thumb 1, a quick lone tap is SPACE, and tapping outside the draft cards slam-stops/skips. Short touch landscape (`innerHeight < 520`) shows a ROTATE PHONE TO PORTRAIT overlay and pauses everything. `index.html` disables selection, the iOS callout, drag, tap highlight, touch-action and overscroll; `contextmenu`/`selectstart`/`dragstart`/`gesturestart` and canvas `touchstart`/`touchmove` are prevented.
+**Jackpot Cards cadence:** the draft opens only when the coin link hits GRAND (20 coins) or after every 3rd cleared wave (`DRAFT_EVERY`); other waves roll on after a 2 s break (`WAVE_BREAK`). `J` stays a manual debug key.
+
+**Phones:** portrait screens (`w/h < 0.85`) rotate the arena 90° and scale it to the screen width (12 px margins); a camera follows the alchemist along the long axis, the arena is masked to the space between the HUD bars, and arrows at the viewport edge mark enemies above/below the view; all movement input (keys, joystick, phone pad, tilt) is converted screen→arena so up is always up, and floating labels stay upright. Touch is tracked by `pointerId`: thumb 1 is a joystick anchored where it landed (86 px base, 20 px nub clamped to 45 px, hidden whenever the flow is not PLAYING), any second finger is SPACE on pointerdown without disturbing thumb 1, a quick lone tap is SPACE, and tapping outside the draft cards slam-stops/skips. Short touch landscape (`innerHeight < 520`) shows a ROTATE PHONE TO PORTRAIT overlay and pauses everything. `index.html` disables selection, the iOS callout, drag, tap highlight, touch-action and overscroll; `contextmenu`/`selectstart`/`dragstart`/`gesturestart` and canvas `touchstart`/`touchmove` are prevented.
 
 **Teaching it:** in waves 1–2 a coach line walks through (1) shift on the beat, (2) lure foes over the *other* realm's runes, (3) chain PERFECT shifts. Any rune that a foe of the other realm is about to cross flashes and grows a tightening warning ring.
 

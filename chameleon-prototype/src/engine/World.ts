@@ -57,6 +57,10 @@ export const LUNGE_CD = 1.5;
 export const MISTIME_LOCK = 1.25;
 /** Shield regen waits this long after a hit. */
 export const SHIELD_DELAY = 4;
+/** Jackpot Cards after every Nth cleared wave (plus whenever the coin link hits GRAND). */
+export const DRAFT_EVERY = 3;
+/** Breather between waves that do not award a draft. */
+export const WAVE_BREAK = 2;
 /** A cascade of at least this many blasts auto-collects every coin on the floor. */
 export const VACUUM_CHAIN = 3;
 
@@ -225,6 +229,8 @@ export class World {
     private spawnTimer = 0;
     /** Seconds since the player was last hurt (shield regen waits SHIELD_DELAY). */
     sinceHurt = 99;
+    /** Seconds until the next wave starts on its own (non-draft waves). */
+    waveBreak = 0;
     private nextEnemyId = 1;
     private nextChainId = 1;
     private readonly chainCounts = new Map<number, number>();
@@ -375,8 +381,14 @@ export class World {
 
         if (this.wave > 0 && this.spawnQueue === 0 && this.activeEnemies === 0 && !this.anyBlastPending()) {
             this.emit({ type: 'WAVE_CLEAR', wave: this.wave });
-            this.emit({ type: 'JACKPOT_TRIGGER', reason: 'WAVE_CLEAR' });
             this.spawnQueue = -1; // wait for startWave()
+            // The draft is a reward for every 3rd wave only; other waves roll on after a breather.
+            if (this.wave % DRAFT_EVERY === 0) this.emit({ type: 'JACKPOT_TRIGGER', reason: 'WAVE_CLEAR' });
+            else this.waveBreak = WAVE_BREAK;
+        }
+        if (this.waveBreak > 0) {
+            this.waveBreak -= dt;
+            if (this.waveBreak <= 0 && this.spawnQueue < 0) this.startWave();
         }
         if (p.hp <= 0 && p.alive) {
             p.alive = false;
@@ -820,6 +832,12 @@ export class World {
         }
     }
 
+    /** Debug / e2e: end the current wave now (every foe dies, nothing left to spawn). */
+    debugClearWave() {
+        this.spawnQueue = 0;
+        for (const e of this.enemies) e.active = false;
+    }
+
     /** Debug / e2e: guaranteed chain reaction. Places a pack of mixed-realm enemies on an opposite-realm rune. */
     spawnChainDemo(): number {
         const h = this.hazards.find((hz) => hz.realm === Realm.SHADOW_ALCHEMY) ?? this.hazards[0];
@@ -1094,6 +1112,7 @@ export class World {
         this.score = this.wave = this.combo = this.linkCoins = this.totalCoins = this.instability = 0;
         this.bestCombo = this.bestChain = this.lureKills = 0;
         this.sinceHurt = 99;
+        this.waveBreak = 0;
         this.coinStreak = 0;
         this.gameOver = false;
         this.spawnQueue = 0;

@@ -57,6 +57,48 @@ hud.setTouch(touchFirst);
 draft.touch = touchFirst;
 
 let arenaScale = 1;
+let portrait = false;
+/** Portrait camera: how far (screen px) the arena can scroll, and the current scroll. */
+let camMax = 0;
+let cam = 0;
+const arenaMask = new Graphics();
+/** Arrows at the viewport edge for enemies the portrait camera cannot see. */
+const offscreen = new Graphics();
+offscreen.eventMode = 'none';
+app.stage.addChildAt(arenaMask, 1);
+app.stage.addChildAt(offscreen, 2);
+
+function updateCamera(snap = false) {
+    if (portrait) {
+        // Player's distance down the long axis, centred in the viewport and clamped to the arena.
+        const target = Math.max(0, Math.min(camMax, world.player.x * arenaScale - arenaRect.h / 2));
+        cam = snap ? target : cam + (target - cam) * 0.12;
+        // With rotation +90°, arena-local (0,0) lands at the rect's top-RIGHT corner.
+        arena.position.set(arenaRect.x + arenaRect.w, arenaRect.y - cam);
+    } else {
+        cam = 0;
+        arena.position.set(arenaRect.x, arenaRect.y);
+    }
+}
+
+function drawOffscreen() {
+    const g = offscreen;
+    g.clear();
+    if (camMax <= 0 || flow.state !== 'PLAYING') return;
+    const top = arenaRect.y;
+    const bot = arenaRect.y + arenaRect.h;
+    for (const e of world.enemies) {
+        if (!e.active || (world.theme === Theme.SHADOW_LENS && !e.revealed)) continue;
+        const p = arena.world.toGlobal({ x: e.x, y: e.y });
+        const up = p.y < top;
+        if (!up && p.y <= bot) continue;
+        const danger = e.realm === world.player.realm;
+        const y = up ? top + 7 : bot - 7;
+        const dir = up ? -1 : 1;
+        const col = arena.palOf(e.realm).enemy;
+        g.poly([p.x, y + dir * 6, p.x - 7, y - dir * 4, p.x + 7, y - dir * 4]).fill({ color: col, alpha: danger ? 0.95 : 0.45 });
+    }
+}
 /** On-screen rect of the arena (after the portrait rotation). */
 const arenaRect = { x: 0, y: 0, w: 0, h: 0 };
 /** Touch-first device (phones/tablets); desktop windows never get the rotate lock. */
@@ -67,19 +109,31 @@ function layout() {
     hud.layout(w, h);
     // Portrait phones: rotate the arena 90° so its long axis runs top-to-bottom and fills the
     // screen. Input is rotated to match (toArena), so "up" on screen is always up.
-    const portrait = w / h < 0.85;
+    portrait = w / h < 0.85;
     arena.rotation = portrait ? Math.PI / 2 : 0;
     juice.setOrientation(arena.rotation);
     const availH = h - hud.topH - hud.bottomH - (portrait ? 8 : 16);
-    const onW0 = portrait ? ARENA_H : ARENA_W;
-    const onH0 = portrait ? ARENA_W : ARENA_H;
-    arenaScale = Math.min((w - (portrait ? 16 : 24)) / onW0, availH / onH0);
-    const onW = onW0 * arenaScale;
-    const onH = onH0 * arenaScale;
-    Object.assign(arenaRect, { x: (w - onW) / 2, y: hud.topH + (portrait ? 4 : 8) + (availH - onH) / 2, w: onW, h: onH });
+    if (portrait) {
+        // Hug the screen edges (12 px). The arena is then taller than the space between the HUD
+        // bars, so a camera follows the alchemist along the long axis (see updateCamera).
+        arenaScale = (w - 24) / ARENA_H;
+        const onW = ARENA_H * arenaScale;
+        const onH = Math.min(ARENA_W * arenaScale, availH);
+        Object.assign(arenaRect, { x: 12, y: hud.topH + 4 + (availH - onH) / 2, w: onW, h: onH });
+        camMax = Math.max(0, ARENA_W * arenaScale - onH);
+    } else {
+        arenaScale = Math.min((w - 24) / ARENA_W, availH / ARENA_H);
+        const onW = ARENA_W * arenaScale;
+        const onH = ARENA_H * arenaScale;
+        Object.assign(arenaRect, { x: (w - onW) / 2, y: hud.topH + 8 + (availH - onH) / 2, w: onW, h: onH });
+        camMax = 0;
+    }
     arena.scale.set(arenaScale);
-    // With rotation +90°, arena-local (0,0) lands at the rect's top-RIGHT corner.
-    arena.position.set(portrait ? arenaRect.x + onW : arenaRect.x, arenaRect.y);
+    arenaMask.clear();
+    arenaMask.rect(arenaRect.x - 6, arenaRect.y - 2, arenaRect.w + 12, arenaRect.h + 4).fill(0xffffff);
+    arena.mask = camMax > 0 ? arenaMask : null;
+    arenaMask.visible = camMax > 0;
+    updateCamera(true);
     vignette.width = w;
     vignette.height = h;
     draftView.layout(w, h);
@@ -134,6 +188,7 @@ const flow = new FSM<State, Event>(
             timeoutEvent: 'TIMEOUT',
             enter(ctx) {
                 world.paused = true;
+                hud.setModal(true);
                 draft.open((suit) => {
                     if (suit) {
                         const tiers = { ...world.tiers, [suit]: world.tiers[suit] + 1 };
@@ -145,6 +200,7 @@ const flow = new FSM<State, Event>(
             },
             exit() {
                 draft.abort(); // no-op when the draft finished normally
+                hud.setModal(false);
                 world.paused = false;
                 if (world.pendingSpawns < 0) world.startWave();
                 draftView.visible = false;
@@ -391,7 +447,9 @@ for (const ev of ['touchstart', 'touchmove'] as const) app.canvas.addEventListen
  *   a quick tap with thumb 1 alone          -> SPACE
  * The mouse keeps aiming the lens.
  */
-const JOY_R = 56;
+/** Thumb travel for full speed; the drawn base ring is a little smaller (~86 px across). */
+const JOY_R = 45;
+const JOY_BASE_R = 43;
 let movePointerId: number | null = null;
 const joyOrigin = { x: 0, y: 0 };
 const joyNow = { x: 0, y: 0 };
@@ -406,16 +464,9 @@ app.stage.on('pointermove', (e: FederatedPointerEvent) => {
     if (e.pointerType === 'touch') {
         if (e.pointerId !== movePointerId) return;
         joyTravel += Math.abs(e.global.x - joyNow.x) + Math.abs(e.global.y - joyNow.y);
+        // The base stays anchored where the thumb landed; only the nub follows (clamped).
         joyNow.x = e.global.x;
         joyNow.y = e.global.y;
-        // Floating stick: dragging past the rim drags the origin along.
-        const dx = joyNow.x - joyOrigin.x;
-        const dy = joyNow.y - joyOrigin.y;
-        const d = Math.hypot(dx, dy);
-        if (d > JOY_R) {
-            joyOrigin.x = joyNow.x - (dx / d) * JOY_R;
-            joyOrigin.y = joyNow.y - (dy / d) * JOY_R;
-        }
         return;
     }
     pointerAim = arena.world.toLocal(e.global);
@@ -443,14 +494,20 @@ const release = (e: PointerEvent) => {
 window.addEventListener('pointerup', release);
 window.addEventListener('pointercancel', release);
 
+/** Joystick only exists in live play: never over the draft, title, results or a demo. */
+const joystickAllowed = () => flow.state === 'PLAYING' && demo === 'off' && !rotateLock;
 function drawJoystick() {
     const g = joystick;
     g.clear();
-    if (movePointerId === null || performance.now() - joyStart < 90) return;
+    g.visible = movePointerId !== null && joystickAllowed() && performance.now() - joyStart > 90;
+    if (!g.visible) return;
     const accent = arena.pal.accent;
-    g.circle(joyOrigin.x, joyOrigin.y, JOY_R).fill({ color: 0xffffff, alpha: 0.06 }).stroke({ width: 2, color: accent, alpha: 0.45 });
-    g.circle(joyOrigin.x, joyOrigin.y, 6).fill({ color: accent, alpha: 0.4 });
-    g.circle(joyNow.x, joyNow.y, 22).fill({ color: accent, alpha: 0.35 }).stroke({ width: 2, color: 0xffffff, alpha: 0.6 });
+    const dx = joyNow.x - joyOrigin.x;
+    const dy = joyNow.y - joyOrigin.y;
+    const d = Math.hypot(dx, dy);
+    const k = d > JOY_R ? JOY_R / d : 1;
+    g.circle(joyOrigin.x, joyOrigin.y, JOY_BASE_R).fill({ color: accent, alpha: 0.15 }).stroke({ width: 1.5, color: 0xffffff, alpha: 0.2 });
+    g.circle(joyOrigin.x + dx * k, joyOrigin.y + dy * k, 10).fill({ color: 0xffffff, alpha: 0.55 });
 }
 
 /** Screen-space direction -> arena-space direction (the arena is rotated 90° on portrait phones). */
@@ -797,6 +854,8 @@ app.ticker.add((ticker) => {
     });
 
     juice.update(dt);
+    updateCamera();
+    drawOffscreen();
     // Combat popups never sit on top of the preset announcement.
     const banner = hud.bannerRect;
     if (banner) {
@@ -848,8 +907,11 @@ function makeDebug() {
             demo,
             demoCaption,
             rotateLock,
+            hudModal: hud.modal,
+            banner: hud.bannerRect !== null,
+            cam,
             simTime: world.time,
-            touch: { movePointerId, joyX: joyNow.x - joyOrigin.x, joyY: joyNow.y - joyOrigin.y },
+            touch: { movePointerId, joyX: joyNow.x - joyOrigin.x, joyY: joyNow.y - joyOrigin.y, origin: { ...joyOrigin }, drawn: joystick.visible, bounds: joystick.visible ? (({ x, y, width, height }) => ({ x, y, w: width, h: height }))(joystick.getBounds()) : null },
             calm,
             muted: audio.muted,
             status: hud.statusLine,
@@ -918,6 +980,21 @@ function makeDebug() {
             world.god = god;
         },
         startDemo: (mode: 'attract' | 'tour') => startDemo(mode),
+        clearWave: () => world.debugClearWave(),
+        /** Dark "ink" pixels where the old suit WORD sat on each card face (should be 0 now). */
+        cardWordInk: () =>
+            Object.fromEntries(
+                (['CLUBS', 'DIAMONDS', 'HEARTS', 'SPADES'] as const).map((suit) => {
+                    const { pixels, width, height } = app.renderer.extract.pixels({ target: new Sprite(tex.cardFaces[suit]), resolution: 1 });
+                    let ink = 0;
+                    for (let y = Math.round(height * 0.77); y < Math.round(height * 0.88); y++)
+                        for (let x = Math.round(width * 0.25); x < Math.round(width * 0.72); x++) {
+                            const i = (y * width + x) * 4;
+                            if (pixels[i + 3] > 200 && pixels[i] + pixels[i + 1] + pixels[i + 2] < 200) ink++;
+                        }
+                    return [suit, ink];
+                }),
+            ),
         /** Player position on screen (e2e: "drag up moves up" on the rotated portrait arena). */
         playerScreen: () => {
             const g = arena.world.toGlobal({ x: world.player.x, y: world.player.y });

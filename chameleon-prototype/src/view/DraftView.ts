@@ -36,6 +36,8 @@ export class DraftView extends Container {
         style: { fontFamily: FONT, fontSize: 15, fill: 0xe8e0ff },
     });
     private readonly grid = new Container();
+    /** Opaque panel behind the suit footer, so nothing from the HUD underneath shows through. */
+    private readonly footPanel = new Graphics();
     private readonly tally = new Container();
     private readonly tallyTexts: Record<Suit, Text>;
     private readonly award = new Container();
@@ -62,7 +64,7 @@ export class DraftView extends Container {
         this.dim.on('pointertap', () => this.onBackgroundTap());
         this.title.anchor.set(0.5);
         this.subtitle.anchor.set(0.5);
-        this.addChild(this.dim, this.title, this.subtitle, this.grid, this.tally, this.award);
+        this.addChild(this.dim, this.footPanel, this.title, this.subtitle, this.grid, this.tally, this.award);
 
         for (let i = 0; i < COLS * ROWS; i++) {
             const c = new Container();
@@ -120,7 +122,7 @@ export class DraftView extends Container {
         this.award.alpha = 0;
         // Pixi v8 hit-tests alpha-0 objects: a faded-out award banner would swallow clicks on the
         // middle card row of the NEXT draft. Decoration must never be a pointer target.
-        for (const deco of [this.award, this.title, this.subtitle, this.tally]) deco.eventMode = 'none';
+        for (const deco of [this.award, this.title, this.subtitle, this.tally, this.footPanel]) deco.eventMode = 'none';
     }
 
     layout(w: number, h: number) {
@@ -155,10 +157,13 @@ export class DraftView extends Container {
         const headerBottom = top + 54 * hs + 2 * 20 * hs + 8;
         const footerTop = h - pad - footH * fs;
         this.tally.position.set(w / 2, footerTop + 10 * fs);
+        this.footPanel.clear();
+        this.footPanel.rect(0, footerTop - 12, w, h - footerTop + 12).fill({ color: 0x07040f, alpha: 0.97 });
+        this.footPanel.rect(0, footerTop - 12, w, 1.5).fill({ color: 0xffd34d, alpha: 0.35 });
         // Grid between them.
         const gridW = COLS * CARD_W + (COLS - 1) * GAP;
         const gridH = ROWS * CARD_H + (ROWS - 1) * GAP;
-        const availH = footerTop - 10 - headerBottom;
+        const availH = footerTop - 22 - headerBottom;
         const scale = Math.min(1.25, availH / gridH, (w - pad * 2) / gridW);
         this.grid.scale.set(scale);
         this.grid.position.set(w / 2, headerBottom + availH / 2);

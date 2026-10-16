@@ -21,6 +21,8 @@ const style = (size: number, fill: number, extra: Partial<TextStyleOptions> = {}
 
 /** Below this width the HUD switches to the two-row compact layout (phones, small laptops). */
 const WIDE_AT = 1180;
+/** How long a preset announcement stays on screen (fades included). */
+export const BANNER_SECONDS = 2.75;
 /** Preset tab height (pill). */
 const TAB_H = 32;
 const SHORT_LABELS: Record<ThemeT, string> = {
@@ -85,7 +87,10 @@ export class HudView extends Container {
     private readonly bannerBg = new Graphics();
     private readonly bannerTitle = new Text({ text: '', style: style(48, 0xffffff, { letterSpacing: 6 }) });
     private readonly bannerTag = new Text({ text: '', style: style(20, 0xffd34d, { fontStyle: 'italic' }) });
-    private readonly bannerHint = new Text({ text: '', style: style(15, 0xe8e0ff, { fontWeight: 'normal', wordWrap: true, wordWrapWidth: 640, align: 'center' }) });
+    private readonly bannerHint = new Text({
+        text: '',
+        style: style(16, 0xffffff, { wordWrap: true, wordWrapWidth: 640, align: 'center', lineHeight: 22, dropShadow: { color: 0x000000, alpha: 0.9, blur: 4, distance: 2, angle: Math.PI / 2 } }),
+    });
     private readonly center = new Container();
     private readonly centerText = new Text({ text: '', style: style(56, 0xffd34d, { letterSpacing: 4, stroke: { color: 0x3a0410, width: 8 } }) });
     private readonly centerSub = new Text({ text: '', style: style(18, 0xffffff) });
@@ -384,7 +389,6 @@ export class HudView extends Container {
         });
 
         // ---- overlays
-        this.bannerBox.scale.set(Math.min(1, (w - 24) / 740, (h - top - bot) * 0.4 / 160));
         this.banner.position.set(w / 2, top + (h - top - bot) * 0.55);
         this.center.position.set(w / 2, top + Math.min(110, (h - top - bot) * 0.22));
         // Compact: the FPS/seed debug line moves under the top bar so it never meets the coach.
@@ -466,15 +470,25 @@ export class HudView extends Container {
         this.bannerTitle.text = info.title;
         this.bannerTag.text = `“${info.tagline}”`;
         this.bannerHint.text = info.hint;
-        this.bannerTitle.y = -36;
-        this.bannerTag.y = 10;
-        this.bannerHint.y = 46;
+        // Size the panel to the screen and to its text (phones get a narrower, taller panel).
+        const W = Math.min(720, this.w - 24);
+        this.bannerHint.style.wordWrapWidth = W - 48;
+        this.bannerTitle.scale.set(1);
+        this.bannerTitle.scale.set(Math.min(1, (W - 48) / Math.max(1, this.bannerTitle.width)));
+        this.bannerTag.scale.set(1);
+        this.bannerTag.scale.set(Math.min(1, (W - 48) / Math.max(1, this.bannerTag.width)));
+        const tH = this.bannerTitle.height;
+        const gH = this.bannerTag.height;
+        const hH = this.bannerHint.height;
+        const H = 22 + tH + 6 + gH + 12 + hH + 22;
+        const x0 = -W / 2;
+        const y0 = -H / 2;
+        this.bannerTitle.y = y0 + 22 + tH / 2;
+        this.bannerTag.y = y0 + 22 + tH + 6 + gH / 2;
+        this.bannerHint.y = y0 + 22 + tH + 6 + gH + 12 + hH / 2;
+        this.bannerBox.scale.set(Math.min(1, ((this.h - this.topH - this.bottomH) * 0.7) / H));
         const g = this.bannerBg;
         g.clear();
-        const W = 720;
-        const H = 160;
-        const x0 = -W / 2;
-        const y0 = -82;
         switch (ts.frame) {
             case 'hazard':
                 g.rect(x0, y0, W, H).fill({ color: 0x0a0402, alpha: 0.85 });
@@ -487,7 +501,7 @@ export class HudView extends Container {
                 g.roundRect(x0, y0, W, H, 80).fill({ color: 0x07040f, alpha: 0.78 });
                 g.roundRect(x0, y0, W, H, 80).stroke({ width: 2, color: accent, alpha: 0.7 });
                 g.roundRect(x0 + 8, y0 + 8, W - 16, H - 16, 72).stroke({ width: 1, color: accent2, alpha: 0.6 });
-                for (const sx of [-1, 1]) g.circle(sx * (W / 2 - 40), y0 + H / 2, 16).stroke({ width: 1.5, color: accent, alpha: 0.7 });
+                if (W > 560) for (const sx of [-1, 1]) g.circle(sx * (W / 2 - 40), y0 + H / 2, 16).stroke({ width: 1.5, color: accent, alpha: 0.7 });
                 break;
             case 'brass':
                 g.rect(x0, y0, W, H).fill({ color: 0x140d05, alpha: 0.85 });
@@ -495,9 +509,9 @@ export class HudView extends Container {
                 for (const [rx, ry] of [[x0 + 12, y0 + 12], [x0 + W - 12, y0 + 12], [x0 + 12, y0 + H - 12], [x0 + W - 12, y0 + H - 12]]) g.circle(rx, ry, 4).fill(accent);
                 break;
             case 'noir':
-                g.rect(x0 - 60, y0 + 4, W + 120, H - 8).fill({ color: 0x000000, alpha: 0.85 });
-                g.rect(x0 - 60, y0 + 4, W + 120, 2).fill({ color: 0xffffff, alpha: 0.5 });
-                g.rect(x0 - 60, y0 + H - 6, W + 120, 2).fill({ color: 0xffffff, alpha: 0.5 });
+                g.rect(x0, y0 + 4, W, H - 8).fill({ color: 0x000000, alpha: 0.88 });
+                g.rect(x0, y0 + 4, W, 2).fill({ color: 0xffffff, alpha: 0.5 });
+                g.rect(x0, y0 + H - 6, W, 2).fill({ color: 0xffffff, alpha: 0.5 });
                 break;
             default:
                 g.roundRect(x0, y0, W, H, 18).fill({ color: 0x07040f, alpha: 0.72 });
@@ -505,10 +519,12 @@ export class HudView extends Container {
         }
         gsap.killTweensOf(this.banner); // fire-and-forget tween: nothing awaits it
         gsap.killTweensOf(this.banner.scale);
-        this.banner.alpha = 1;
-        this.banner.scale.set(0.85);
-        gsap.to(this.banner.scale, { x: 1, y: 1, duration: 0.35, ease: 'back.out(2)' });
-        gsap.to(this.banner, { alpha: 0, duration: 0.5, delay: 1.7 });
+        // 0.3 s fade in, readable hold, 0.3 s fade out: 2.75 s on screen in total.
+        this.banner.alpha = 0;
+        this.banner.scale.set(0.92);
+        gsap.to(this.banner.scale, { x: 1, y: 1, duration: 0.3, ease: 'back.out(1.6)' });
+        gsap.to(this.banner, { alpha: 1, duration: 0.3, ease: 'power1.out' });
+        gsap.to(this.banner, { alpha: 0, duration: 0.3, delay: BANNER_SECONDS - 0.3, ease: 'power1.in' });
     }
 
     private fitCenter(): number {
@@ -715,6 +731,16 @@ export class HudView extends Container {
         if (banner) out['preset-banner'] = { x: Math.round(banner.x), y: Math.round(banner.y), w: Math.round(banner.w), h: Math.round(banner.h) };
         if (this.center.alpha > 0.05) out['center-popup'] = box(this.centerText);
         return out;
+    }
+
+    /** A modal (draft) is up: the bottom row (vitality, preset tabs, widget) steps out of the way. */
+    setModal(on: boolean) {
+        for (const c of [this.bottomBar, this.hpBox, this.hpLabel, this.widgetBox, ...this.buttons.map((b) => b.c)]) c.visible = !on;
+        if (!on) this.hpLabel.visible = !this.compact;
+    }
+
+    get modal(): boolean {
+        return !this.bottomBar.visible;
     }
 
     setStatus(muted: boolean, calm: boolean) {

@@ -318,7 +318,7 @@ export function bakeTextures(renderer: Renderer): Textures {
                 g.roundRect(2, 2, CW - 4, CH - 4, 12).fill(0xfdf6e3);
                 g.roundRect(2, 2, CW - 4, CH - 4, 12).stroke({ width: 4, color: col });
                 g.roundRect(8, 8, CW - 16, CH - 16, 8).stroke({ width: 1.5, color: col, alpha: 0.5 });
-                g.circle(CW / 2, CH / 2 - 4, 34).fill({ color: col, alpha: 0.16 });
+                g.circle(CW / 2, CH / 2, 36).fill({ color: col, alpha: 0.16 });
             },
             CW,
             CH,
@@ -326,16 +326,16 @@ export function bakeTextures(renderer: Renderer): Textures {
             (c) => {
                 const big = new Text({ text: SUIT_INFO[suit].glyph, style: { fontFamily: FONT, fontSize: 64, fill: col, stroke: { color: 0x1a0b33, width: 3 } } });
                 big.anchor.set(0.5);
-                big.position.set(CW / 2, CH / 2 - 6);
+                big.position.set(CW / 2, CH / 2 - 2);
                 const corner = new Text({ text: SUIT_INFO[suit].glyph, style: { fontFamily: FONT, fontSize: 20, fill: col } });
                 corner.position.set(10, 6);
                 const corner2 = new Text({ text: SUIT_INFO[suit].glyph, style: { fontFamily: FONT, fontSize: 20, fill: col } });
                 corner2.anchor.set(1, 1);
                 corner2.position.set(CW - 10, CH - 6);
-                const name = new Text({ text: SUIT_INFO[suit].name, style: { fontFamily: FONT, fontSize: 12, fontWeight: 'bold', fill: 0x1a0b33, letterSpacing: 2 } });
-                name.anchor.set(0.5);
-                name.position.set(CW / 2, CH - 26);
-                c.addChild(big, corner, corner2, name);
+                // A classic card: centre emblem + two corner pips, no words.
+                corner2.rotation = Math.PI;
+                corner2.anchor.set(0, 0);
+                c.addChild(big, corner, corner2);
             },
         );
     }

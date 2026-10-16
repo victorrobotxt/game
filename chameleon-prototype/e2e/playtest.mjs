@@ -135,6 +135,12 @@ try {
     s = await snap();
     check('SPACE on the title starts wave 1 in PLAYING', s.flow === 'PLAYING' && s.wave === 1 && !s.title);
     check('first-wave coach teaches the shift', /SPACE shifts realm/.test(s.coach), s.coach);
+    // Wave 1 -> 2 must roll straight on: the draft is only for 20 coins or every 3rd wave.
+    await dbg('godMode', true);
+    await dbg('clearWave');
+    await sleep(2800);
+    s = await snap();
+    check('wave 1 -> 2 transitions with no Jackpot Cards draft (only GRAND or every 3rd wave)', s.flow === 'PLAYING' && s.wave === 2 && s.draftReason === '', `flow=${s.flow} wave=${s.wave} draftReason="${s.draftReason}"`);
     const notes0 = s.musicNotes;
     await sleep(1000);
     s = await snap();
@@ -203,6 +209,14 @@ try {
     for (let a = 0; a < 5; a++) for (let b = a + 1; b < 5; b++) minDist = Math.min(minDist, looks[a].reduce((d, v, k) => d + Math.abs(v - looks[b][k]), 0));
     check('each preset reskins the arena (distinct rendered palettes)', minDist >= 5, `avg RGB ${looks.map((l) => l.join('/')).join('  ')}; min distance ${minDist}`);
     check('each preset has its own tempo', tempos.size === 5, [...tempos].join(', ') + ' BPM');
+    await game.keyboard.press('Digit3');
+    await sleep(2450);
+    const bannerLate = (await snap()).banner;
+    await sleep(700);
+    const bannerGone = !(await snap()).banner;
+    check('preset banner stays readable for ~2.75 s, then fades', bannerLate && bannerGone, `visible at 2.45 s: ${bannerLate}, gone at 3.15 s: ${bannerGone}`);
+    const ink = await dbg('cardWordInk');
+    check('card faces are wordless (centre emblem + corner pips only)', Object.values(ink).every((n) => n === 0), JSON.stringify(ink));
     await game.keyboard.press('KeyC');
     await sleep(50);
     s = await snap();
@@ -553,6 +567,9 @@ try {
         let rep = await pdbg('layoutReport');
         const share = rep.arena.h / 844;
         check('390x844 portrait: arena is rotated and fills > 68% of the height', rep.rotated && share > 0.68, `arena ${Math.round(rep.arena.w)}x${Math.round(rep.arena.h)} = ${(share * 100).toFixed(0)}% of 844`);
+        const sideL = rep.arena.x;
+        const sideR = 390 - (rep.arena.x + rep.arena.w);
+        check('390x844 portrait: arena hugs the screen width (slim side margins)', rep.arena.w / 390 > 0.9 && sideL <= 16 && sideR <= 16, `width ${Math.round(rep.arena.w)} px = ${((rep.arena.w / 390) * 100).toFixed(0)}%, margins ${Math.round(sideL)}/${Math.round(sideR)} px`);
         await pg.screenshot({ path: resolve(shots, '11-iphone-390x844-play.png') });
 
         // Real two-finger input through CDP: thumb 1 drags and HOLDS, thumb 2 taps and lifts.
@@ -566,10 +583,16 @@ try {
             await sleep(30);
         }
         await sleep(300);
-        const a0 = await pdbg('playerScreen');
+        const a0 = (await psnap()).player;
         const before = await psnap();
         await sleep(300);
-        const a1 = await pdbg('playerScreen');
+        const a1 = (await psnap()).player;
+        // Joystick: small, anchored where the thumb landed (even when the thumb travels far).
+        await touch('touchMove', [t1(195, 470)]);
+        await sleep(80);
+        const joy = (await psnap()).touch;
+        await touch('touchMove', [t1(195, 528)]);
+        check('joystick is small, subtle and anchored at the first touch', joy.drawn && joy.bounds.w <= 100 && joy.bounds.h <= 100 && Math.abs(joy.origin.x - 195) < 1 && Math.abs(joy.origin.y - 600) < 1, `bounds ${Math.round(joy.bounds.w)}x${Math.round(joy.bounds.h)}, origin (${joy.origin.x}, ${joy.origin.y}) after a 130 px drag`);
         const realm0 = before.realm;
         const t2 = { x: 320, y: 300, id: 2, radiusX: 4, radiusY: 4, force: 1 };
         await touch('touchStart', [t1(195, 528), t2]); // thumb 2 down (CDP: touchStart lists all active points)
@@ -577,19 +600,29 @@ try {
         const mid = await psnap();
         await touch('touchEnd', [t2]); // CDP: touchEnd lists the points that LIFT -> thumb 2 only
         await sleep(60);
-        const b0 = await pdbg('playerScreen');
+        const b0 = (await psnap()).player;
         await sleep(400);
-        const b1 = await pdbg('playerScreen');
+        const b1 = (await psnap()).player;
         const after = await psnap();
         await touch('touchEnd', [t1(195, 528)]);
         await sleep(100);
         const released = await psnap();
-        check('drag up on the rotated portrait arena moves the alchemist UP the screen', a1.y < a0.y - 20, `screen y ${a0.y.toFixed(0)} -> ${a1.y.toFixed(0)}`);
-        check('multi-touch: thumb 2 tap shifts realm without interrupting thumb 1', mid.realm !== realm0 && after.touch.movePointerId !== null && after.touch.movePointerId === before.touch.movePointerId && b1.y < b0.y - 20 && released.touch.movePointerId === null, `realm ${realm0} -> ${mid.realm}; after thumb 2 lifted moved ${(b0.y - b1.y).toFixed(0)} px up; stick id ${before.touch.movePointerId}/${after.touch.movePointerId}/${released.touch.movePointerId}`);
+        // Rotated arena: screen-up is arena -x.
+        check('drag up on the rotated portrait arena moves the alchemist UP the screen', a1.x < a0.x - 20, `arena x ${a0.x.toFixed(0)} -> ${a1.x.toFixed(0)} (camera follows)`);
+        check('multi-touch: thumb 2 tap shifts realm without interrupting thumb 1', mid.realm !== realm0 && after.touch.movePointerId !== null && after.touch.movePointerId === before.touch.movePointerId && b1.x < b0.x - 20 && released.touch.movePointerId === null, `realm ${realm0} -> ${mid.realm}; after thumb 2 lifted moved ${(b0.x - b1.x).toFixed(0)} px up; stick id ${before.touch.movePointerId}/${after.touch.movePointerId}/${released.touch.movePointerId}`);
 
-        // Jackpot Cards must fit the phone with zero overlap.
+        // Jackpot Cards must fit the phone with zero overlap, and the joystick must not draw over it.
+        await touch('touchStart', [t1(100, 600)]);
+        await touch('touchMove', [t1(100, 560)]);
+        await sleep(150);
+        const joyBefore = (await psnap()).touch.drawn;
         await pdbg('triggerDraft');
         await pg.waitForFunction(() => window.__GAME_DEBUG__.snapshot().draft === 'PICKING', null, { timeout: 6000 }).catch(() => {});
+        await touch('touchMove', [t1(100, 520)]);
+        await sleep(100);
+        const dsnap = await psnap();
+        check('joystick hides while a modal (draft) is open; the HUD bottom row steps aside', joyBefore && !dsnap.touch.drawn && dsnap.hudModal, `drawn before ${joyBefore}, during draft ${dsnap.touch.drawn}, hud hidden ${dsnap.hudModal}`);
+        await touch('touchEnd', [t1(100, 520)]);
         await pdbg('flipCard', 1);
         await sleep(500);
         rep = await pdbg('layoutReport');
